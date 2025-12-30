@@ -7,7 +7,7 @@ from datetime import datetime
 # CONFIG
 # ===========================
 # Replace with your published CSV link from Google Sheets
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/export?format=csv"
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=1002181482&single=true&output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 
