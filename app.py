@@ -2,65 +2,64 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import requests
+from io import StringIO
 
-# ===========================
+# ==========================================================
 # CONFIG
-# ===========================
-# Replace with your published CSV link from Google Sheets
+# ==========================================================
 GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=1002181482&single=true&output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 
-st.set_page_config(
-    page_title="Procurement Analysis Dashboard",
-    layout="wide"
-)
+st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
-# ===========================
-# GLOBAL STYLING
-# ===========================
+# ==========================================================
+# CSS Styling
+# ==========================================================
 st.markdown(f"""
 <style>
-body {{ background:#FAFAFA; }}
-h1 {{ text-align:center; color:{HEADER_BLUE}; }}
+body {{ font-family:Segoe UI;background:#FAFAFA;margin:20px; }}
+
+.kpi-grid {{
+ display:grid;
+ grid-template-columns:repeat(4,1fr);
+ gap:14px;
+ margin-bottom:25px;
+}}
 
 .kpi-card {{
-    background:white;
-    border-radius:12px;
-    padding:14px 16px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.12);
-    border-left:6px solid {HEADER_BLUE};
+ background:white;
+ border-radius:12px;
+ padding:14px 16px;
+ box-shadow:0 4px 10px rgba(0,0,0,0.12);
+ border-left:6px solid {HEADER_BLUE};
 }}
 
-.kpi-title {{
-    font-size:13px;
-    color:#546E7A;
-    font-weight:600;
-}}
-
-.kpi-value {{
-    font-size:22px;
-    font-weight:700;
-    color:{HEADER_BLUE};
-}}
-
-hr {{ margin:25px 0; }}
+.kpi-title {{ font-size:13px;color:#546E7A;font-weight:600; }}
+.kpi-value {{ font-size:22px;font-weight:700;color:{HEADER_BLUE}; }}
 
 .stButton button {{
     background-color: {HEADER_BLUE};
     color:white;
 }}
+
+hr {{ margin:25px 0; }}
 </style>
 """, unsafe_allow_html=True)
 
-# ===========================
+# ==========================================================
 # LOAD DATA
-# ===========================
+# ==========================================================
 @st.cache_data(ttl=30)
 def load_data():
-    df_raw = pd.read_csv(GOOGLE_SHEET_CSV)
-    df = df_raw[["Equipment name","Service","QTY Requested","Unit Price RWF"]].copy()
-    df.columns = ["Equipment","Service","Quantity","Unit_Price_RWF"]
+    # Fetch Google Sheet CSV reliably
+    r = requests.get(GOOGLE_SHEET_CSV)
+    r.raise_for_status()
+    df_raw = pd.read_csv(StringIO(r.text))
+
+    df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]].copy()
+    df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF"]
 
     df["Equipment"] = df["Equipment"].astype(str).str.strip()
     df["Service"] = df["Service"].astype(str).str.strip()
@@ -76,14 +75,14 @@ def load_data():
 
 df = load_data()
 
-# ===========================
+# ==========================================================
 # LAST UPDATED
-# ===========================
+# ==========================================================
 st.caption(f"📊 **Data source:** Google Sheet  |  **Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-# ===========================
+# ==========================================================
 # FILTERS
-# ===========================
+# ==========================================================
 st.markdown("### 🔎 Filters")
 f1, f2 = st.columns([2,3])
 with f1:
@@ -95,9 +94,9 @@ df_f = df[df["Service"].isin(service_filter)]
 if search_equipment:
     df_f = df_f[df_f["Equipment"].str.contains(search_equipment, case=False)]
 
-# ===========================
-# WRAP LABEL
-# ===========================
+# ==========================================================
+# WRAP LABEL FUNCTION
+# ==========================================================
 def wrap_text(text, width=30):
     words, lines, line = text.split(), [], ""
     for w in words:
@@ -111,9 +110,9 @@ def wrap_text(text, width=30):
 
 df_f["Equipment_wrapped"] = df_f["Equipment"].apply(wrap_text)
 
-# ===========================
-# TOP 10 LOGIC
-# ===========================
+# ==========================================================
+# TOP 10 FUNCTION
+# ==========================================================
 def top10(df_in, metric):
     if metric=="Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
@@ -122,9 +121,9 @@ def top10(df_in, metric):
         df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
     return df_grouped.sort_values(metric, ascending=False).head(10)
 
-# ===========================
-# BAR CHART
-# ===========================
+# ==========================================================
+# BAR CHART FUNCTION
+# ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
         df_in,
@@ -149,14 +148,14 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig.update_xaxes(tickangle=-45)
     return fig
 
-# ===========================
+# ==========================================================
 # HEADER
-# ===========================
+# ==========================================================
 st.markdown("<h1>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=True)
 
-# ===========================
+# ==========================================================
 # KPIs
-# ===========================
+# ==========================================================
 k1,k2,k3,k4 = st.columns(4)
 k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df_f['Total_Price'].sum()):,}</div></div>", unsafe_allow_html=True)
 k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df_f['Quantity'].sum()):,}</div></div>", unsafe_allow_html=True)
@@ -165,9 +164,9 @@ k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div>
 
 st.markdown("---")
 
-# ===========================
+# ==========================================================
 # DOWNLOAD BUTTON
-# ===========================
+# ==========================================================
 st.download_button(
     "⬇️ Download Filtered Data (CSV)",
     df_f.to_csv(index=False),
@@ -175,9 +174,9 @@ st.download_button(
     mime="text/csv"
 )
 
-# ===========================
+# ==========================================================
 # TABS
-# ===========================
+# ==========================================================
 tabs = st.tabs(["Overview"] + sorted(df_f["Service"].unique()))
 
 # OVERVIEW
