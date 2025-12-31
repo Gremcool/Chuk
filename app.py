@@ -159,4 +159,13 @@ tabs = st.tabs(["Overview"] + services_sorted)
 # OVERVIEW
 with tabs[0]:
     st.plotly_chart(bar_chart(top10(df,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df,"Tot
+    st.plotly_chart(bar_chart(top10(df,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df,"Quantity"),"Top 10 Equipment by Quantity","Quantity","Quantity"), use_container_width=True)
+
+# SERVICE TABS
+for i, service in enumerate(services_sorted, start=1):
+    with tabs[i]:
+        d = df[df["Service"]==service]
+        st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {service}","Unit_Price","USD",True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {service}","Total_Price","USD",True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d,"Quantity"),f"Top 10 Quantity – {service}","Quantity","Quantity"), use_container_width=True)
