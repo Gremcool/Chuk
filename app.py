@@ -64,15 +64,11 @@ def load_data():
     df["Service"] = df["Service"].astype(str).str.strip()
     df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
 
-    # FIX: safely parse numeric columns
+    # ===== ROBUST NUMERIC PARSING =====
     def clean_numeric(col):
-        return (
-            col.astype(str)
-               .str.replace(",", "")
-               .str.replace(" ", "")
-               .replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
-               .astype(float)
-        )
+        col = col.astype(str).str.replace(",", "").str.replace(" ", "")
+        col = col.replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
+        return pd.to_numeric(col, errors="coerce").fillna(0)
 
     df["Quantity"] = clean_numeric(df["Quantity"])
     df["Unit_Price_RWF"] = clean_numeric(df["Unit_Price_RWF"])
