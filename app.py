@@ -142,7 +142,7 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     )
     
     # ===== BLUE HEADER BOX (unchanged height) =====
-    y0, y1 = 1.02, 1.08
+    y0, y1 = 1.02, 1.12
     fig.add_shape(
         type="rect",
         xref="paper",
