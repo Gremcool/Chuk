@@ -4,6 +4,7 @@ import plotly.express as px
 from datetime import datetime
 import requests
 from io import StringIO
+import re
 
 # ==========================================================
 # CONFIG
@@ -66,8 +67,11 @@ def load_data():
 
     # ===== ROBUST NUMERIC PARSING =====
     def clean_numeric(col):
+        # Remove commas, spaces, currency symbols, letters
         col = col.astype(str).str.replace(",", "").str.replace(" ", "")
         col = col.replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
+        # Remove any remaining non-numeric characters (e.g., "$", "units")
+        col = col.apply(lambda x: re.sub(r"[^\d.]", "", x) if pd.notnull(x) else "0")
         return pd.to_numeric(col, errors="coerce").fillna(0)
 
     df["Quantity"] = clean_numeric(df["Quantity"])
@@ -89,6 +93,8 @@ st.caption(f"📊 **Data source:** Google Sheet  |  **Last updated:** {datetime.
 # WRAP LABEL FUNCTION
 # ==========================================================
 def wrap_text(text, width=30):
+    if not isinstance(text, str):
+        return ""
     words, lines, line = text.split(), [], ""
     for w in words:
         if len(line) + len(w) <= width:
@@ -97,7 +103,7 @@ def wrap_text(text, width=30):
             lines.append(line)
             line = w
     lines.append(line)
-    return "<br>".join(lines[:2])
+    return "<br>".join(lines[:2])  # wrap max 2 lines
 
 df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
 
@@ -105,7 +111,7 @@ df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
 # TOP 10 FUNCTION
 # ==========================================================
 def top10(df_in, metric):
-    if metric=="Unit_Price":
+    if metric == "Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
         df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
     else:
@@ -147,7 +153,7 @@ st.markdown("<h1>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=T
 # ==========================================================
 # KPIs
 # ==========================================================
-k1,k2,k3,k4 = st.columns(4)
+k1, k2, k3, k4 = st.columns(4)
 k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df['Total_Price'].sum()):,}</div></div>", unsafe_allow_html=True)
 k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df['Quantity'].sum()):,}</div></div>", unsafe_allow_html=True)
 k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df['Service'].nunique()}</div></div>", unsafe_allow_html=True)
@@ -173,14 +179,14 @@ tabs = st.tabs(["Overview"] + service_list)
 
 # OVERVIEW
 with tabs[0]:
-    st.plotly_chart(bar_chart(top10(df,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df,"Quantity"),"Top 10 Equipment by Quantity","Quantity","Quantity"), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df, "Unit_Price"), "Top 10 Equipment by Unit Price (USD)", "Unit_Price", "USD", True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df, "Total_Price"), "Top 10 Equipment by Total Price (USD)", "Total_Price", "USD", True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df, "Quantity"), "Top 10 Equipment by Quantity", "Quantity", "Quantity"), use_container_width=True)
 
 # SERVICE TABS
 for i, service in enumerate(service_list, start=1):
     with tabs[i]:
-        d = df[df["Service"]==service]
-        st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {service}","Unit_Price","USD",True), use_container_width=True)
-        st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {service}","Total_Price","USD",True), use_container_width=True)
-        st.plotly_chart(bar_chart(top10(d,"Quantity"),f"Top 10 Quantity – {service}","Quantity","Quantity"), use_container_width=True)
+        d = df[df["Service"] == service]
+        st.plotly_chart(bar_chart(top10(d, "Unit_Price"), f"Top 10 Unit Price – {service}", "Unit_Price", "USD", True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d, "Total_Price"), f"Top 10 Total Price – {service}", "Total_Price", "USD", True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d, "Quantity"), f"Top 10 Quantity – {service}", "Quantity", "Quantity"), use_container_width=True)
