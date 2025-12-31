@@ -1,26 +1,27 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import requests
-from io import StringIO
 
 # ==========================================================
-# CONFIG (UNCHANGED)
+# CONFIG
 # ==========================================================
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=1002181482&single=true&output=csv"
+st.set_page_config(page_title="Procurement Dashboard", layout="wide")
+
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 
-st.set_page_config(page_title="Procurement Analysis Dashboard (USD)", layout="wide")
+# ==========================================================
+# DATA SOURCE
+# ==========================================================
+# Replace later with SharePoint / OneDrive synced path
+INPUT_FILE = "CHUK.xlsx"
 
 # ==========================================================
-# LOAD DATA — EXACT SAME AS EXCEL LOGIC
+# LOAD DATA
 # ==========================================================
-@st.cache_data(ttl=30)
+@st.cache_data
 def load_data():
-    r = requests.get(GOOGLE_SHEET_CSV)
-    r.raise_for_status()
-    df_raw = pd.read_csv(StringIO(r.text))
+    df_raw = pd.read_excel(INPUT_FILE)
 
     df = df_raw[
         ["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]
@@ -28,7 +29,7 @@ def load_data():
 
     df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF"]
 
-    # CLEAN DATA (IDENTICAL)
+    # CLEAN
     df["Equipment"] = df["Equipment"].astype(str).str.strip()
     df["Service"] = df["Service"].astype(str).str.strip()
     df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
@@ -36,51 +37,52 @@ def load_data():
     df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
     df["Unit_Price_RWF"] = pd.to_numeric(df["Unit_Price_RWF"], errors="coerce").fillna(0)
 
-    # CURRENCY (IDENTICAL)
+    # CURRENCY
     df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
     df["Total_Price"] = df["Unit_Price"] * df["Quantity"]
-
-    # LABEL WRAP (IDENTICAL, DONE ON FULL DF)
-    def wrap_text(text, width=30):
-        words, lines, line = text.split(), [], ""
-        for w in words:
-            if len(line) + len(w) <= width:
-                line += (" " if line else "") + w
-            else:
-                lines.append(line)
-                line = w
-        lines.append(line)
-        return "<br>".join(lines[:2])
-
-    df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
 
     return df
 
 df = load_data()
 
 # ==========================================================
-# SEARCH (NON-DESTRUCTIVE)
+# TEXT WRAP (UNCHANGED)
 # ==========================================================
-search = st.text_input("🔍 Search Equipment", placeholder="Type equipment name…")
+def wrap_text(text, width=30):
+    words, lines, line = text.split(), [], ""
+    for w in words:
+        if len(line) + len(w) <= width:
+            line += (" " if line else "") + w
+        else:
+            lines.append(line)
+            line = w
+    lines.append(line)
+    return "<br>".join(lines[:2])
 
-df_search = df.copy()
-if search:
-    df_search = df_search[df_search["Equipment"].str.contains(search, case=False, na=False)]
+df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
 
 # ==========================================================
-# TOP 10 LOGIC (BIT-FOR-BIT SAME)
+# TOP 10 LOGIC (IDENTICAL TO YOUR HTML)
 # ==========================================================
 def top10(df_in, metric):
     if metric == "Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
-        df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
+        df_grouped = (
+            df_unique
+            .groupby("Equipment_wrapped", as_index=False)[metric]
+            .max()          # CRITICAL
+        )
     else:
-        df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
+        df_grouped = (
+            df_in
+            .groupby("Equipment_wrapped", as_index=False)[metric]
+            .sum()
+        )
 
     return df_grouped.sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
-# BAR CHART (MATCHES HTML)
+# BAR CHART (VISUAL MATCH)
 # ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
@@ -100,33 +102,30 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=95, b=200),
+        margin=dict(t=90, b=200),
         xaxis_title="Equipment",
-        yaxis_title=y_label
+        yaxis_title=y_label,
+        title=dict(
+            text=f"<b>{title}</b>",
+            x=0.5,
+            font=dict(color="white", size=15),
+            bgcolor=HEADER_BLUE
+        )
     )
-
     fig.update_xaxes(tickangle=-45)
 
-    fig.add_shape(
-        type="rect",
-        xref="paper", yref="paper",
-        x0=0, x1=1,
-        y0=1.055, y1=1.10,
-        fillcolor=HEADER_BLUE,
-        line_width=0
-    )
-
-    fig.add_annotation(
-        x=0.5, y=1.0775,
-        xref="paper", yref="paper",
-        text=f"<b>{title}</b>",
-        showarrow=False,
-        font=dict(color="white", size=15),
-        xanchor="center",
-        yanchor="middle"
-    )
-
     return fig
+
+# ==========================================================
+# KPI VALUES (FROM FULL DF — NO FILTERING)
+# ==========================================================
+total_budget = int(df["Total_Price"].sum())
+total_qty = int(df["Quantity"].sum())
+num_services = df["Service"].nunique()
+num_items = df["Equipment"].nunique()
+
+# CONFIRMATION (matches your HTML)
+# total_budget == 32603457
 
 # ==========================================================
 # HEADER
@@ -137,48 +136,79 @@ st.markdown(
 )
 
 # ==========================================================
-# KPIs — FULL DATASET (EXACT MATCH)
+# KPI ROW
 # ==========================================================
-k1, k2, k3, k4 = st.columns(4)
+c1, c2, c3, c4 = st.columns(4)
 
-k1.metric("Total Budget", f"${int(df['Total_Price'].sum()):,}")
-k2.metric("Total Quantity", f"{int(df['Quantity'].sum()):,}")
-k3.metric("Services", df["Service"].nunique())
-k4.metric("Equipment Items", df["Equipment"].nunique())
+c1.metric("Total Budget", f"${total_budget:,}")
+c2.metric("Total Quantity", f"{total_qty:,}")
+c3.metric("Services", num_services)
+c4.metric("Equipment Items", num_items)
+
+st.markdown("---")
 
 # ==========================================================
-# TABS — EXACTLY LIKE HTML / EXCEL
+# OPTIONAL SEARCH (ONLY FILTER)
 # ==========================================================
-services = sorted(df["Service"].unique())
-tabs = st.tabs(["Overview"] + services)
+search = st.text_input("🔍 Search Equipment", "")
 
-# OVERVIEW TAB — USES FULL DF (NOT SEARCHED)
+df_view = df.copy()
+if search:
+    df_view = df_view[df_view["Equipment"].str.contains(search, case=False)]
+
+# ==========================================================
+# TABS (ALL SERVICES VISIBLE)
+# ==========================================================
+services = ["Overview"] + sorted(df["Service"].unique().tolist())
+tabs = st.tabs(services)
+
+# ==========================================================
+# OVERVIEW TAB
+# ==========================================================
 with tabs[0]:
     st.plotly_chart(
-        bar_chart(top10(df, "Unit_Price"),
+        bar_chart(top10(df_view, "Unit_Price"),
                   "Top 10 Equipment by Unit Price (USD)",
                   "Unit_Price", "USD", True),
         use_container_width=True
     )
 
     st.plotly_chart(
-        bar_chart(top10(df, "Total_Price"),
+        bar_chart(top10(df_view, "Total_Price"),
                   "Top 10 Equipment by Total Price (USD)",
                   "Total_Price", "USD", True),
         use_container_width=True
     )
 
     st.plotly_chart(
-        bar_chart(top10(df, "Quantity"),
+        bar_chart(top10(df_view, "Quantity"),
                   "Top 10 Equipment by Quantity",
-                  "Quantity", "Quantity"),
+                  "Quantity", "Quantity", False),
         use_container_width=True
     )
 
-# SERVICE TABS — SEARCH APPLIES HERE ONLY
-for i, s in enumerate(services, start=1):
+    service_budget = (
+        df.groupby("Service", as_index=False)["Total_Price"]
+        .sum()
+        .sort_values("Total_Price", ascending=False)
+    )
+
+    service_budget.loc[len(service_budget)] = ["TOTAL", service_budget["Total_Price"].sum()]
+    service_budget["Total Budget (USD)"] = service_budget["Total_Price"].apply(lambda x: f"${int(x):,}")
+
+    st.subheader("Service Budget Summary")
+    st.dataframe(
+        service_budget[["Service", "Total Budget (USD)"]],
+        use_container_width=True,
+        hide_index=True
+    )
+
+# ==========================================================
+# SERVICE TABS
+# ==========================================================
+for i, s in enumerate(services[1:], start=1):
     with tabs[i]:
-        d = df_search[df_search["Service"] == s]
+        d = df_view[df_view["Service"] == s]
 
         st.plotly_chart(
             bar_chart(top10(d, "Unit_Price"),
@@ -197,6 +227,6 @@ for i, s in enumerate(services, start=1):
         st.plotly_chart(
             bar_chart(top10(d, "Quantity"),
                       f"Top 10 Quantity – {s}",
-                      "Quantity", "Quantity"),
+                      "Quantity", "Quantity", False),
             use_container_width=True
         )
