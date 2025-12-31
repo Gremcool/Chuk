@@ -67,8 +67,10 @@ def load_data():
 
     # ===== ROBUST NUMERIC PARSING =====
     def clean_numeric(col):
+        # Remove commas, spaces, currency symbols, letters
         col = col.astype(str).str.replace(",", "").str.replace(" ", "")
         col = col.replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
+        # Remove any remaining non-numeric characters (e.g., "$", "units")
         col = col.apply(lambda x: re.sub(r"[^\d.]", "", x) if pd.notnull(x) else "0")
         return pd.to_numeric(col, errors="coerce").fillna(0)
 
@@ -134,29 +136,37 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=130, b=200),  # original top margin
+        margin=dict(t=80,b=200),
         xaxis_title="Equipment",
         yaxis_title=y_label
     )
-    # ===== Original taller blue header rectangle =====
+    
+    # ===== BLUE HEADER BOX (unchanged height) =====
+    y0, y1 = 1.02, 1.12
     fig.add_shape(
         type="rect",
-        xref="paper", yref="paper",
-        x0=0, x1=1,
-        y0=1.00, y1=1.18,  # original height
+        xref="paper",
+        yref="paper",
+        x0=0,
+        x1=1,
+        y0=y0,
+        y1=y1,
         fillcolor=HEADER_BLUE,
         line_width=0
     )
-    # ===== Perfectly centered title text =====
+    
+    # ===== CENTER TEXT VERTICALLY =====
     fig.add_annotation(
-        x=0.5, y=(1.00 + 1.18)/2,  # vertical center of rectangle
-        xref="paper", yref="paper",
+        x=0.5,
+        y=(y0 + y1)/2,  # vertical center
+        xref="paper",
+        yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
-        font=dict(color="white", size=16),
-        xanchor="center",
-        yanchor="middle"
+        font=dict(color="white", size=15),
+        align="center"
     )
+    
     fig.update_xaxes(tickangle=-45)
     return fig
 
