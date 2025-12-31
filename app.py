@@ -8,7 +8,7 @@ from io import StringIO
 # ==========================================================
 # CONFIG
 # ==========================================================
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=1002181482&single=true&output=csv"
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 
