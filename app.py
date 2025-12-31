@@ -8,7 +8,7 @@ from io import StringIO
 # ==========================================================
 # CONFIG
 # ==========================================================
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=927771155&single=true&output=csv"
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=1002181482&single=true&output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 
@@ -43,19 +43,17 @@ body {{ font-family:Segoe UI;background:#FAFAFA;margin:20px; }}
     background-color: {HEADER_BLUE};
     color:white;
 }}
-
-hr {{ margin:25px 0; }}
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================================
 # LOAD DATA
 # ==========================================================
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def load_data():
-    # Fetch Google Sheet CSV reliably
+    # Fetch CSV via requests
     r = requests.get(GOOGLE_SHEET_CSV)
-    r.raise_for_status()
+    r.raise_for_status()  # Stop if URL is broken
     df_raw = pd.read_csv(StringIO(r.text))
 
     df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]].copy()
@@ -65,11 +63,13 @@ def load_data():
     df["Service"] = df["Service"].astype(str).str.strip()
     df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
 
+    # Convert to numeric
     df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
     df["Unit_Price_RWF"] = pd.to_numeric(df["Unit_Price_RWF"], errors="coerce").fillna(0)
 
+    # Correct total price formula
     df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
-    df["Total_Price"] = df["Unit_Price"] * df["Quantity"]
+    df["Total_Price"] = (df["Unit_Price_RWF"] * df["Quantity"]) / USD_RATE
 
     return df
 
@@ -79,20 +79,6 @@ df = load_data()
 # LAST UPDATED
 # ==========================================================
 st.caption(f"📊 **Data source:** Google Sheet  |  **Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-# ==========================================================
-# FILTERS
-# ==========================================================
-st.markdown("### 🔎 Filters")
-f1, f2 = st.columns([2,3])
-with f1:
-    service_filter = st.multiselect("Service", options=sorted(df["Service"].unique()), default=sorted(df["Service"].unique()))
-with f2:
-    search_equipment = st.text_input("Search Equipment", placeholder="Type part of equipment name…")
-
-df_f = df[df["Service"].isin(service_filter)]
-if search_equipment:
-    df_f = df_f[df_f["Equipment"].str.contains(search_equipment, case=False)]
 
 # ==========================================================
 # WRAP LABEL FUNCTION
@@ -108,7 +94,7 @@ def wrap_text(text, width=30):
     lines.append(line)
     return "<br>".join(lines[:2])
 
-df_f["Equipment_wrapped"] = df_f["Equipment"].apply(wrap_text)
+df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
 
 # ==========================================================
 # TOP 10 FUNCTION
@@ -157,38 +143,20 @@ st.markdown("<h1>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=T
 # KPIs
 # ==========================================================
 k1,k2,k3,k4 = st.columns(4)
-k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df_f['Total_Price'].sum()):,}</div></div>", unsafe_allow_html=True)
-k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df_f['Quantity'].sum()):,}</div></div>", unsafe_allow_html=True)
-k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df_f['Service'].nunique()}</div></div>", unsafe_allow_html=True)
-k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df_f['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
+k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df['Total_Price'].sum()):,}</div></div>", unsafe_allow_html=True)
+k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df['Quantity'].sum()):,}</div></div>", unsafe_allow_html=True)
+k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df['Service'].nunique()}</div></div>", unsafe_allow_html=True)
+k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
 # ==========================================================
-# DOWNLOAD BUTTON
-# ==========================================================
-st.download_button(
-    "⬇️ Download Filtered Data (CSV)",
-    df_f.to_csv(index=False),
-    file_name="filtered_procurement_data.csv",
-    mime="text/csv"
-)
-
-# ==========================================================
 # TABS
 # ==========================================================
-tabs = st.tabs(["Overview"] + sorted(df_f["Service"].unique()))
+services_sorted = sorted(df["Service"].unique())
+tabs = st.tabs(["Overview"] + services_sorted)
 
 # OVERVIEW
 with tabs[0]:
-    st.plotly_chart(bar_chart(top10(df_f,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df_f,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df_f,"Quantity"),"Top 10 Equipment by Quantity","Quantity","Quantity"), use_container_width=True)
-
-# SERVICE TABS
-for i, service in enumerate(sorted(df_f["Service"].unique()), start=1):
-    with tabs[i]:
-        d = df_f[df_f["Service"]==service]
-        st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {service}","Unit_Price","USD",True), use_container_width=True)
-        st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {service}","Total_Price","USD",True), use_container_width=True)
-        st.plotly_chart(bar_chart(top10(d,"Quantity"),f"Top 10 Quantity – {service}","Quantity","Quantity"), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df,"Tot
