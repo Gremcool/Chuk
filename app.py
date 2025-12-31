@@ -64,21 +64,18 @@ def load_data():
     df["Service"] = df["Service"].astype(str).str.strip()
     df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
 
-    # FIX: properly parse Quantity and Unit Price (remove commas/spaces)
-    df["Quantity"] = (
-        df["Quantity"].astype(str)
-        .str.replace(",", "")
-        .str.replace(" ", "")
-        .str.replace("NA", "0")
-        .astype(float)
-    )
-    df["Unit_Price_RWF"] = (
-        df["Unit_Price_RWF"].astype(str)
-        .str.replace(",", "")
-        .str.replace(" ", "")
-        .str.replace("NA", "0")
-        .astype(float)
-    )
+    # FIX: safely parse numeric columns
+    def clean_numeric(col):
+        return (
+            col.astype(str)
+               .str.replace(",", "")
+               .str.replace(" ", "")
+               .replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
+               .astype(float)
+        )
+
+    df["Quantity"] = clean_numeric(df["Quantity"])
+    df["Unit_Price_RWF"] = clean_numeric(df["Unit_Price_RWF"])
 
     df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
     df["Total_Price"] = df["Unit_Price"] * df["Quantity"]
