@@ -141,8 +141,8 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         yaxis_title=y_label
     )
     
-    # ===== BLUE HEADER BOX (unchanged height) =====
-    y0, y1 = 1.02, 1.10
+    # ===== BLUE HEADER BOX (slight padding to avoid cutting text) =====
+    y0, y1 = 1.02, 1.12
     fig.add_shape(
         type="rect",
         xref="paper",
@@ -164,8 +164,8 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         text=f"<b>{title}</b>",
         showarrow=False,
         font=dict(color="white", size=15),
-        align="center"
-        yanchor="middle"   # <-- this makes vertical centering work
+        align="center",
+        yanchor="middle"   # <-- ensures text is vertically centered
     )
     
     fig.update_xaxes(tickangle=-45)
