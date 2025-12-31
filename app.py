@@ -18,18 +18,19 @@ def load_data():
     df_raw = pd.read_csv(GOOGLE_SHEET_CSV)
     df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]].copy()
     df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF"]
-    
+
     df["Equipment"] = df["Equipment"].astype(str).str.strip()
     df["Service"] = df["Service"].astype(str).str.strip()
     df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
-    
+
     df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
     df["Unit_Price_RWF"] = pd.to_numeric(df["Unit_Price_RWF"], errors="coerce").fillna(0)
-    
-    df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
-    df["Total_Price"] = df["Unit_Price_RWF"] * df["Quantity"] / USD_RATE
 
-    # Wrap labels
+    # Total price logic exactly like your HTML code
+    df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
+    df["Total_Price"] = (df["Unit_Price_RWF"] * df["Quantity"]) / USD_RATE
+
+    # Label wrapping for bar charts
     def wrap_text(text, width=30):
         words, lines, line = text.split(), [], ""
         for w in words:
@@ -40,7 +41,7 @@ def load_data():
                 line = w
         lines.append(line)
         return "<br>".join(lines[:2])
-    
+
     df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
     return df
 
@@ -63,7 +64,7 @@ def top10(df_in, metric):
         df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
     else:
         df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
-    df_grouped = df_grouped[df_grouped[metric] > 0]  # remove zeroes
+    df_grouped = df_grouped[df_grouped[metric] > 0]
     return df_grouped.sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
@@ -103,18 +104,19 @@ st.markdown(
 # KPI CARDS
 # ==========================================================
 c1, c2, c3, c4 = st.columns(4)
-c1.markdown(f"<div style='background:white;border-left:6px solid {HEADER_BLUE};border-radius:12px;padding:14px 16px;'><div style='font-size:13px;color:#546E7A;font-weight:600'>Total Budget</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>${total_budget:,}</div></div>", unsafe_allow_html=True)
-c2.markdown(f"<div style='background:white;border-left:6px solid {HEADER_BLUE};border-radius:12px;padding:14px 16px;'><div style='font-size:13px;color:#546E7A;font-weight:600'>Total Quantity</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{total_qty:,}</div></div>", unsafe_allow_html=True)
-c3.markdown(f"<div style='background:white;border-left:6px solid {HEADER_BLUE};border-radius:12px;padding:14px 16px;'><div style='font-size:13px;color:#546E7A;font-weight:600'>Services</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{num_services}</div></div>", unsafe_allow_html=True)
-c4.markdown(f"<div style='background:white;border-left:6px solid {HEADER_BLUE};border-radius:12px;padding:14px 16px;'><div style='font-size:13px;color:#546E7A;font-weight:600'>Equipment Items</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{num_items}</div></div>", unsafe_allow_html=True)
+card_style = f"background:white;border-left:6px solid {HEADER_BLUE};border-radius:12px;padding:14px 16px;"
+c1.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Total Budget</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>${total_budget:,}</div></div>", unsafe_allow_html=True)
+c2.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Total Quantity</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{total_qty:,}</div></div>", unsafe_allow_html=True)
+c3.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Services</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{num_services}</div></div>", unsafe_allow_html=True)
+c4.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Equipment Items</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{num_items}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
 # ==========================================================
-# SERVICE TABS (VISIBLE TWO ROWS)
+# SERVICE TABS (TWO ROWS)
 # ==========================================================
 all_services = ["Overview"] + sorted(df["Service"].unique())
-num_cols = 11  # split 22 services into 2 rows
+num_cols = 11  # 22 services -> 2 rows
 rows = [all_services[i:i+num_cols] for i in range(0, len(all_services), num_cols)]
 
 tab_choice = None
@@ -124,12 +126,11 @@ for row in rows:
         if cols[i].button(svc):
             tab_choice = svc
 
-# Default to Overview if none clicked yet
 if tab_choice is None:
     tab_choice = "Overview"
 
 # ==========================================================
-# DISPLAY SELECTED TAB
+# DISPLAY TAB CONTENT
 # ==========================================================
 if tab_choice == "Overview":
     st.plotly_chart(bar_chart(top10(df, "Unit_Price"), "Top 10 Equipment by Unit Price (USD)", "Unit_Price", "USD", True), use_container_width=True)
