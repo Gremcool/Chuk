@@ -8,29 +8,43 @@ import plotly.express as px
 st.set_page_config(page_title="Procurement Dashboard", layout="wide")
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
-INPUT_FILE = "CHUK.xlsx"  # Make sure it's the same file as your HTML script
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=1002181482&single=true&output=csv"
 
 # ==========================================================
 # LOAD DATA
 # ==========================================================
-df_raw = pd.read_excel(INPUT_FILE)
-df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]].copy()
-df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF"]
+@st.cache_data(ttl=60)
+def load_data():
+    df_raw = pd.read_csv(GOOGLE_SHEET_CSV)
+    df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]].copy()
+    df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF"]
+    
+    df["Equipment"] = df["Equipment"].astype(str).str.strip()
+    df["Service"] = df["Service"].astype(str).str.strip()
+    df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
+    
+    df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
+    df["Unit_Price_RWF"] = pd.to_numeric(df["Unit_Price_RWF"], errors="coerce").fillna(0)
+    
+    df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
+    df["Total_Price"] = df["Unit_Price_RWF"] * df["Quantity"] / USD_RATE
 
-# ==========================================================
-# CLEAN DATA
-# ==========================================================
-df["Equipment"] = df["Equipment"].astype(str).str.strip()
-df["Service"] = df["Service"].astype(str).str.strip()
-df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
-df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
-df["Unit_Price_RWF"] = pd.to_numeric(df["Unit_Price_RWF"], errors="coerce").fillna(0)
+    # Wrap labels
+    def wrap_text(text, width=30):
+        words, lines, line = text.split(), [], ""
+        for w in words:
+            if len(line) + len(w) <= width:
+                line += (" " if line else "") + w
+            else:
+                lines.append(line)
+                line = w
+        lines.append(line)
+        return "<br>".join(lines[:2])
+    
+    df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
+    return df
 
-# ==========================================================
-# CURRENCY CORRECTED
-# ==========================================================
-df["Total_Price"] = df["Unit_Price_RWF"] * df["Quantity"] / USD_RATE
-df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
+df = load_data()
 
 # ==========================================================
 # KPI VALUES
@@ -41,23 +55,7 @@ num_services = df["Service"].nunique()
 num_items = df["Equipment"].nunique()
 
 # ==========================================================
-# LABEL WRAP
-# ==========================================================
-def wrap_text(text, width=30):
-    words, lines, line = text.split(), [], ""
-    for w in words:
-        if len(line) + len(w) <= width:
-            line += (" " if line else "") + w
-        else:
-            lines.append(line)
-            line = w
-    lines.append(line)
-    return "<br>".join(lines[:2])
-
-df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
-
-# ==========================================================
-# TOP 10 LOGIC
+# TOP 10 FUNCTION
 # ==========================================================
 def top10(df_in, metric):
     if metric == "Unit_Price":
@@ -65,6 +63,7 @@ def top10(df_in, metric):
         df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
     else:
         df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
+    df_grouped = df_grouped[df_grouped[metric] > 0]  # remove zeroes
     return df_grouped.sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
@@ -112,32 +111,27 @@ c4.markdown(f"<div style='background:white;border-left:6px solid {HEADER_BLUE};b
 st.markdown("---")
 
 # ==========================================================
-# TABS (ALL SERVICES VISIBLE IN 2 ROWS)
+# SERVICE TABS (VISIBLE TWO ROWS)
 # ==========================================================
-services = ["Overview"] + sorted(df["Service"].unique())
-rows_needed = 2
-tabs_per_row = (len(services) + rows_needed - 1) // rows_needed
+all_services = ["Overview"] + sorted(df["Service"].unique())
+num_cols = 11  # split 22 services into 2 rows
+rows = [all_services[i:i+num_cols] for i in range(0, len(all_services), num_cols)]
 
-tabs_layout = []
-for i in range(rows_needed):
-    start = i * tabs_per_row
-    end = start + tabs_per_row
-    tabs_layout.append(services[start:end])
-
-# Streamlit has only one st.tabs(), so combine two rows visually using columns
-tab_objects = []
-for row in tabs_layout:
+tab_choice = None
+for row in rows:
     cols = st.columns(len(row))
-    for i, s in enumerate(row):
-        tab_objects.append((cols[i], s))
+    for i, svc in enumerate(row):
+        if cols[i].button(svc):
+            tab_choice = svc
+
+# Default to Overview if none clicked yet
+if tab_choice is None:
+    tab_choice = "Overview"
 
 # ==========================================================
-# OVERVIEW TAB
+# DISPLAY SELECTED TAB
 # ==========================================================
-overview_idx = services.index("Overview")
-col, tab_name = tab_objects[overview_idx]
-with col:
-    st.subheader(tab_name)
+if tab_choice == "Overview":
     st.plotly_chart(bar_chart(top10(df, "Unit_Price"), "Top 10 Equipment by Unit Price (USD)", "Unit_Price", "USD", True), use_container_width=True)
     st.plotly_chart(bar_chart(top10(df, "Total_Price"), "Top 10 Equipment by Total Price (USD)", "Total_Price", "USD", True), use_container_width=True)
     st.plotly_chart(bar_chart(top10(df, "Quantity"), "Top 10 Equipment by Quantity", "Quantity", "Quantity", False), use_container_width=True)
@@ -148,14 +142,8 @@ with col:
     st.subheader("Service Budget Summary")
     st.dataframe(service_budget[["Service", "Total Budget (USD)"]], use_container_width=True, hide_index=True)
 
-# ==========================================================
-# SERVICE TABS
-# ==========================================================
-for i, s in enumerate(services[1:], start=1):
-    col, tab_name = tab_objects[i]
-    with col:
-        st.subheader(tab_name)
-        d = df[df["Service"] == s]
-        st.plotly_chart(bar_chart(top10(d, "Unit_Price"), f"Top 10 Unit Price – {s}", "Unit_Price", "USD", True), use_container_width=True)
-        st.plotly_chart(bar_chart(top10(d, "Total_Price"), f"Top 10 Total Price – {s}", "Total_Price", "USD", True), use_container_width=True)
-        st.plotly_chart(bar_chart(top10(d, "Quantity"), f"Top 10 Quantity – {s}", "Quantity", "Quantity", False), use_container_width=True)
+else:
+    d = df[df["Service"] == tab_choice]
+    st.plotly_chart(bar_chart(top10(d, "Unit_Price"), f"Top 10 Unit Price – {tab_choice}", "Unit_Price", "USD", True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(d, "Total_Price"), f"Top 10 Total Price – {tab_choice}", "Total_Price", "USD", True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(d, "Quantity"), f"Top 10 Quantity – {tab_choice}", "Quantity", "Quantity", False), use_container_width=True)
