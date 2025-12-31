@@ -165,6 +165,7 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         showarrow=False,
         font=dict(color="white", size=15),
         align="center"
+        yanchor="middle"   # <-- this makes vertical centering work
     )
     
     fig.update_xaxes(tickangle=-45)
