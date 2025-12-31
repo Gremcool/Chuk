@@ -67,10 +67,8 @@ def load_data():
 
     # ===== ROBUST NUMERIC PARSING =====
     def clean_numeric(col):
-        # Remove commas, spaces, currency symbols, letters
         col = col.astype(str).str.replace(",", "").str.replace(" ", "")
         col = col.replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
-        # Remove any remaining non-numeric characters (e.g., "$", "units")
         col = col.apply(lambda x: re.sub(r"[^\d.]", "", x) if pd.notnull(x) else "0")
         return pd.to_numeric(col, errors="coerce").fillna(0)
 
@@ -103,7 +101,7 @@ def wrap_text(text, width=30):
             lines.append(line)
             line = w
     lines.append(line)
-    return "<br>".join(lines[:2])  # wrap max 2 lines
+    return "<br>".join(lines[:2])
 
 df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
 
@@ -141,7 +139,7 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         yaxis_title=y_label
     )
     
-    # ===== BLUE HEADER BOX (slight padding to avoid cutting text) =====
+    # ===== BLUE HEADER BOX =====
     y0, y1 = 1.02, 1.12
     fig.add_shape(
         type="rect",
@@ -155,17 +153,17 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         line_width=0
     )
     
-    # ===== CENTER TEXT VERTICALLY =====
+    # ===== TITLE TEXT SLIGHTLY HIGHER =====
     fig.add_annotation(
         x=0.5,
-        y=(y0 + y1)/2,  # vertical center
+        y=(y0 + y1)/2 + 0.005,  # <-- slightly higher
         xref="paper",
         yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
         font=dict(color="white", size=15),
         align="center",
-        yanchor="middle"   # <-- ensures text is vertically centered
+        yanchor="middle"
     )
     
     fig.update_xaxes(tickangle=-45)
