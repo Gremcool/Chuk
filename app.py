@@ -15,11 +15,11 @@ HEADER_BLUE = "#0D47A1"
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# STYLING
+# CSS Styling
 # ==========================================================
 st.markdown(f"""
 <style>
-body {{ font-family:Segoe UI;background:#FAFAFA; }}
+body {{ font-family:Segoe UI;background:#FAFAFA;margin:20px; }}
 
 .kpi-grid {{
  display:grid;
@@ -39,14 +39,21 @@ body {{ font-family:Segoe UI;background:#FAFAFA; }}
 .kpi-title {{ font-size:13px;color:#546E7A;font-weight:600; }}
 .kpi-value {{ font-size:22px;font-weight:700;color:{HEADER_BLUE}; }}
 
+.stButton button {{
+    background-color: {HEADER_BLUE};
+    color:white;
+}}
+
+hr {{ margin:25px 0; }}
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================================
-# LOAD DATA (FIXED GOOGLE SHEETS FETCH)
+# LOAD DATA
 # ==========================================================
 @st.cache_data(ttl=30)
 def load_data():
+    # Fetch Google Sheet CSV reliably
     r = requests.get(GOOGLE_SHEET_CSV)
     r.raise_for_status()
     df_raw = pd.read_csv(StringIO(r.text))
@@ -69,22 +76,26 @@ def load_data():
 df = load_data()
 
 # ==========================================================
-# HEADER
+# LAST UPDATED
 # ==========================================================
-st.markdown("<h1>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=True)
-st.caption(f"📊 Data source: Google Sheet | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.caption(f"📊 **Data source:** Google Sheet  |  **Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ==========================================================
-# SEARCH (SERVICE FILTER REMOVED)
+# FILTERS
 # ==========================================================
-search_equipment = st.text_input("🔍 Search Equipment", placeholder="Type part of equipment name…")
+st.markdown("### 🔎 Filters")
+f1, f2 = st.columns([2,3])
+with f1:
+    service_filter = st.multiselect("Service", options=sorted(df["Service"].unique()), default=sorted(df["Service"].unique()))
+with f2:
+    search_equipment = st.text_input("Search Equipment", placeholder="Type part of equipment name…")
 
-df_f = df.copy()
+df_f = df[df["Service"].isin(service_filter)]
 if search_equipment:
     df_f = df_f[df_f["Equipment"].str.contains(search_equipment, case=False)]
 
 # ==========================================================
-# WRAP LABEL
+# WRAP LABEL FUNCTION
 # ==========================================================
 def wrap_text(text, width=30):
     words, lines, line = text.split(), [], ""
@@ -100,28 +111,20 @@ def wrap_text(text, width=30):
 df_f["Equipment_wrapped"] = df_f["Equipment"].apply(wrap_text)
 
 # ==========================================================
-# TOP 10 LOGIC (UNCHANGED)
+# TOP 10 FUNCTION
 # ==========================================================
 def top10(df_in, metric):
-    if df_in.empty:
-        return df_in
-    if metric == "Unit_Price":
+    if metric=="Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
-        grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
+        df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
     else:
-        grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
-    return grouped.sort_values(metric, ascending=False).head(10)
+        df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
+    return df_grouped.sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
-# BAR CHART (FIXED HEADER CENTER + BAR VISIBILITY)
+# BAR CHART FUNCTION
 # ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
-    if df_in.empty:
-        st.info("No data available for this selection.")
-        return None
-
-    ymax = df_in[y_col].max() * 1.15 if df_in[y_col].max() > 0 else 1
-
     fig = px.bar(
         df_in,
         x="Equipment_wrapped",
@@ -130,41 +133,25 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         color_discrete_sequence=px.colors.qualitative.Set3,
         text=df_in[y_col].apply(lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}")
     )
-
     fig.update_traces(textposition="outside")
     fig.update_layout(
         showlegend=False,
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=90, b=200),
+        margin=dict(t=80,b=200),
         xaxis_title="Equipment",
-        yaxis_title=y_label,
-        yaxis=dict(range=[0, ymax])
+        yaxis_title=y_label
     )
-
-    # HEADER BANNER (VERTICALLY CENTERED)
-    fig.add_shape(
-        type="rect",
-        xref="paper", yref="paper",
-        x0=0, x1=1,
-        y0=1.04, y1=1.14,
-        fillcolor=HEADER_BLUE,
-        line_width=0
-    )
-
-    fig.add_annotation(
-        x=0.5, y=1.09,
-        xref="paper", yref="paper",
-        text=f"<b>{title}</b>",
-        showarrow=False,
-        font=dict(color="white", size=15),
-        xanchor="center",
-        yanchor="middle"
-    )
-
+    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0, x1=1, y0=1.02, y1=1.12, fillcolor=HEADER_BLUE, line_width=0)
+    fig.add_annotation(x=0.5, y=1.07, xref="paper", yref="paper", text=f"<b>{title}</b>", showarrow=False, font=dict(color="white",size=15))
     fig.update_xaxes(tickangle=-45)
     return fig
+
+# ==========================================================
+# HEADER
+# ==========================================================
+st.markdown("<h1>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=True)
 
 # ==========================================================
 # KPIs
@@ -178,45 +165,30 @@ k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div>
 st.markdown("---")
 
 # ==========================================================
-# SERVICE BUDGET TABLE (RESTORED)
+# DOWNLOAD BUTTON
 # ==========================================================
-st.subheader("Service Budget Summary")
-
-service_budget = (
-    df_f.groupby("Service", as_index=False)["Total_Price"]
-    .sum()
-    .sort_values("Total_Price", ascending=False)
+st.download_button(
+    "⬇️ Download Filtered Data (CSV)",
+    df_f.to_csv(index=False),
+    file_name="filtered_procurement_data.csv",
+    mime="text/csv"
 )
 
-service_budget.loc[len(service_budget)] = ["TOTAL", service_budget["Total_Price"].sum()]
-service_budget["Total_Price"] = service_budget["Total_Price"].apply(lambda x: f"${int(x):,}")
-
-st.dataframe(service_budget, use_container_width=True)
-
 # ==========================================================
-# TABS (ALL SERVICES CLICKABLE)
+# TABS
 # ==========================================================
-services = sorted(df_f["Service"].unique())
-tabs = st.tabs(["Overview"] + services)
+tabs = st.tabs(["Overview"] + sorted(df_f["Service"].unique()))
 
+# OVERVIEW
 with tabs[0]:
-    for metric, title, label, cur in [
-        ("Unit_Price","Top 10 Equipment by Unit Price (USD)","USD",True),
-        ("Total_Price","Top 10 Equipment by Total Price (USD)","USD",True),
-        ("Quantity","Top 10 Equipment by Quantity","Quantity",False)
-    ]:
-        fig = bar_chart(top10(df_f,metric), title, metric, label, cur)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df_f,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df_f,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df_f,"Quantity"),"Top 10 Equipment by Quantity","Quantity","Quantity"), use_container_width=True)
 
-for i, service in enumerate(services, start=1):
+# SERVICE TABS
+for i, service in enumerate(sorted(df_f["Service"].unique()), start=1):
     with tabs[i]:
-        d = df_f[df_f["Service"] == service]
-        for metric, label, cur in [
-            ("Unit_Price","USD",True),
-            ("Total_Price","USD",True),
-            ("Quantity","Quantity",False)
-        ]:
-            fig = bar_chart(top10(d,metric), f"Top 10 {metric.replace('_',' ')} – {service}", metric, label, cur)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True)
+        d = df_f[df_f["Service"]==service]
+        st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {service}","Unit_Price","USD",True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {service}","Total_Price","USD",True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d,"Quantity"),f"Top 10 Quantity – {service}","Quantity","Quantity"), use_container_width=True)
