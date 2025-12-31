@@ -1,67 +1,129 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from datetime import datetime
+import requests
+from io import StringIO
 
+# ==========================================================
 # CONFIG
-st.set_page_config(page_title="Procurement Dashboard", layout="wide")
+# ==========================================================
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=927771155&single=true&output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=927771155&single=true&output=csv"
 
+st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
+
+# ==========================================================
+# CSS Styling
+# ==========================================================
+st.markdown(f"""
+<style>
+body {{ font-family:Segoe UI;background:#FAFAFA;margin:20px; }}
+
+.kpi-grid {{
+ display:grid;
+ grid-template-columns:repeat(4,1fr);
+ gap:14px;
+ margin-bottom:25px;
+}}
+
+.kpi-card {{
+ background:white;
+ border-radius:12px;
+ padding:14px 16px;
+ box-shadow:0 4px 10px rgba(0,0,0,0.12);
+ border-left:6px solid {HEADER_BLUE};
+}}
+
+.kpi-title {{ font-size:13px;color:#546E7A;font-weight:600; }}
+.kpi-value {{ font-size:22px;font-weight:700;color:{HEADER_BLUE}; }}
+
+.stButton button {{
+    background-color: {HEADER_BLUE};
+    color:white;
+}}
+
+hr {{ margin:25px 0; }}
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================================
 # LOAD DATA
-@st.cache_data(ttl=60)
+# ==========================================================
+@st.cache_data(ttl=30)
 def load_data():
-    df_raw = pd.read_csv(GOOGLE_SHEET_CSV)
+    # Fetch Google Sheet CSV reliably
+    r = requests.get(GOOGLE_SHEET_CSV)
+    r.raise_for_status()
+    df_raw = pd.read_csv(StringIO(r.text))
+
     df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]].copy()
     df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF"]
 
-    # STRIP & CLEAN
     df["Equipment"] = df["Equipment"].astype(str).str.strip()
     df["Service"] = df["Service"].astype(str).str.strip()
     df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
 
-    # CONVERT TO NUMERIC
     df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
     df["Unit_Price_RWF"] = pd.to_numeric(df["Unit_Price_RWF"], errors="coerce").fillna(0)
 
-    # TOTAL PRICE
     df["Unit_Price"] = df["Unit_Price_RWF"] / USD_RATE
-    df["Total_Price"] = (df["Unit_Price_RWF"] * df["Quantity"]) / USD_RATE
+    df["Total_Price"] = df["Unit_Price"] * df["Quantity"]
 
-    # LABEL WRAP
-    def wrap_text(text, width=30):
-        words, lines, line = text.split(), [], ""
-        for w in words:
-            if len(line) + len(w) <= width:
-                line += (" " if line else "") + w
-            else:
-                lines.append(line)
-                line = w
-        lines.append(line)
-        return "<br>".join(lines[:2])
-
-    df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
     return df
 
 df = load_data()
 
-# KPI VALUES
-total_budget = int(df["Total_Price"].sum())
-total_qty = int(df["Quantity"].sum())
-num_services = df["Service"].nunique()
-num_items = df["Equipment"].nunique()
+# ==========================================================
+# LAST UPDATED
+# ==========================================================
+st.caption(f"📊 **Data source:** Google Sheet  |  **Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+# ==========================================================
+# FILTERS
+# ==========================================================
+st.markdown("### 🔎 Filters")
+f1, f2 = st.columns([2,3])
+with f1:
+    service_filter = st.multiselect("Service", options=sorted(df["Service"].unique()), default=sorted(df["Service"].unique()))
+with f2:
+    search_equipment = st.text_input("Search Equipment", placeholder="Type part of equipment name…")
+
+df_f = df[df["Service"].isin(service_filter)]
+if search_equipment:
+    df_f = df_f[df_f["Equipment"].str.contains(search_equipment, case=False)]
+
+# ==========================================================
+# WRAP LABEL FUNCTION
+# ==========================================================
+def wrap_text(text, width=30):
+    words, lines, line = text.split(), [], ""
+    for w in words:
+        if len(line) + len(w) <= width:
+            line += (" " if line else "") + w
+        else:
+            lines.append(line)
+            line = w
+    lines.append(line)
+    return "<br>".join(lines[:2])
+
+df_f["Equipment_wrapped"] = df_f["Equipment"].apply(wrap_text)
+
+# ==========================================================
 # TOP 10 FUNCTION
+# ==========================================================
 def top10(df_in, metric):
-    if metric == "Unit_Price":
+    if metric=="Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
         df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
     else:
         df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
-    df_grouped = df_grouped[df_grouped[metric] > 0]
     return df_grouped.sort_values(metric, ascending=False).head(10)
 
+# ==========================================================
 # BAR CHART FUNCTION
+# ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
         df_in,
@@ -77,56 +139,56 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=95, b=200),
+        margin=dict(t=80,b=200),
         xaxis_title="Equipment",
         yaxis_title=y_label
     )
+    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0, x1=1, y0=1.02, y1=1.12, fillcolor=HEADER_BLUE, line_width=0)
+    fig.add_annotation(x=0.5, y=1.07, xref="paper", yref="paper", text=f"<b>{title}</b>", showarrow=False, font=dict(color="white",size=15))
     fig.update_xaxes(tickangle=-45)
     return fig
 
+# ==========================================================
 # HEADER
-st.markdown(
-    f"<h1 style='text-align:center;color:{HEADER_BLUE};'>Procurement Analysis Dashboard (USD)</h1>",
-    unsafe_allow_html=True
-)
+# ==========================================================
+st.markdown("<h1>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=True)
 
-# KPI CARDS
-c1, c2, c3, c4 = st.columns(4)
-card_style = f"background:white;border-left:6px solid {HEADER_BLUE};border-radius:12px;padding:14px 16px;"
-c1.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Total Budget</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>${total_budget:,}</div></div>", unsafe_allow_html=True)
-c2.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Total Quantity</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{total_qty:,}</div></div>", unsafe_allow_html=True)
-c3.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Services</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{num_services}</div></div>", unsafe_allow_html=True)
-c4.markdown(f"<div style='{card_style}'><div style='font-size:13px;color:#546E7A;font-weight:600'>Equipment Items</div><div style='font-size:22px;font-weight:700;color:{HEADER_BLUE}'>{num_items}</div></div>", unsafe_allow_html=True)
+# ==========================================================
+# KPIs
+# ==========================================================
+k1,k2,k3,k4 = st.columns(4)
+k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df_f['Total_Price'].sum()):,}</div></div>", unsafe_allow_html=True)
+k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df_f['Quantity'].sum()):,}</div></div>", unsafe_allow_html=True)
+k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df_f['Service'].nunique()}</div></div>", unsafe_allow_html=True)
+k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df_f['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# SERVICE TABS (TWO ROWS)
-all_services = ["Overview"] + sorted(df["Service"].unique())
-num_cols = 11  # 22 services -> 2 neat rows
-rows = [all_services[i:i+num_cols] for i in range(0, len(all_services), num_cols)]
-tab_choice = None
-for row in rows:
-    cols = st.columns(len(row))
-    for i, svc in enumerate(row):
-        if cols[i].button(svc):
-            tab_choice = svc
-if tab_choice is None:
-    tab_choice = "Overview"
+# ==========================================================
+# DOWNLOAD BUTTON
+# ==========================================================
+st.download_button(
+    "⬇️ Download Filtered Data (CSV)",
+    df_f.to_csv(index=False),
+    file_name="filtered_procurement_data.csv",
+    mime="text/csv"
+)
 
-# DISPLAY TAB CONTENT
-if tab_choice == "Overview":
-    st.plotly_chart(bar_chart(top10(df, "Unit_Price"), "Top 10 Equipment by Unit Price (USD)", "Unit_Price", "USD", True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df, "Total_Price"), "Top 10 Equipment by Total Price (USD)", "Total_Price", "USD", True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df, "Quantity"), "Top 10 Equipment by Quantity", "Quantity", "Quantity", False), use_container_width=True)
+# ==========================================================
+# TABS
+# ==========================================================
+tabs = st.tabs(["Overview"] + sorted(df_f["Service"].unique()))
 
-    service_budget = df.groupby("Service", as_index=False)["Total_Price"].sum().sort_values("Total_Price", ascending=False)
-    service_budget.loc[len(service_budget)] = ["TOTAL", service_budget["Total_Price"].sum()]
-    service_budget["Total Budget (USD)"] = service_budget["Total_Price"].apply(lambda x: f"${int(x):,}")
-    st.subheader("Service Budget Summary")
-    st.dataframe(service_budget[["Service", "Total Budget (USD)"]], use_container_width=True, hide_index=True)
+# OVERVIEW
+with tabs[0]:
+    st.plotly_chart(bar_chart(top10(df_f,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df_f,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True), use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df_f,"Quantity"),"Top 10 Equipment by Quantity","Quantity","Quantity"), use_container_width=True)
 
-else:
-    d = df[df["Service"] == tab_choice]
-    st.plotly_chart(bar_chart(top10(d, "Unit_Price"), f"Top 10 Unit Price – {tab_choice}", "Unit_Price", "USD", True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(d, "Total_Price"), f"Top 10 Total Price – {tab_choice}", "Total_Price", "USD", True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(d, "Quantity"), f"Top 10 Quantity – {tab_choice}", "Quantity", "Quantity", False), use_container_width=True)
+# SERVICE TABS
+for i, service in enumerate(sorted(df_f["Service"].unique()), start=1):
+    with tabs[i]:
+        d = df_f[df_f["Service"]==service]
+        st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {service}","Unit_Price","USD",True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {service}","Total_Price","USD",True), use_container_width=True)
+        st.plotly_chart(bar_chart(top10(d,"Quantity"),f"Top 10 Quantity – {service}","Quantity","Quantity"), use_container_width=True)
