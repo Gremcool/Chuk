@@ -134,22 +134,22 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=120, b=200),  # keep top margin consistent
+        margin=dict(t=130, b=200),  # original top margin
         xaxis_title="Equipment",
         yaxis_title=y_label
     )
-    # ===== Blue header rectangle tightly wrapped =====
+    # ===== Original taller blue header rectangle =====
     fig.add_shape(
         type="rect",
         xref="paper", yref="paper",
         x0=0, x1=1,
-        y0=1.04, y1=1.10,  # tighter around title
+        y0=1.00, y1=1.18,  # original height
         fillcolor=HEADER_BLUE,
         line_width=0
     )
-    # ===== Perfectly centered title =====
+    # ===== Perfectly centered title text =====
     fig.add_annotation(
-        x=0.5, y=(1.04 + 1.10)/2,  # vertical center of rectangle
+        x=0.5, y=(1.00 + 1.18)/2,  # vertical center of rectangle
         xref="paper", yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
