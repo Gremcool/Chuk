@@ -6,7 +6,7 @@ import plotly.express as px
 st.set_page_config(page_title="Procurement Dashboard", layout="wide")
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pubhtml?gid=927771155&single=true"
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=927771155&single=true&output=csv"
 
 # LOAD DATA
 @st.cache_data(ttl=60)
