@@ -149,7 +149,7 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     )
     # ===== Centered header text vertically =====
     fig.add_annotation(
-        x=0.3, y=1.09,  # center vertically in rectangle
+        x=0.1, y=1.09,  # center vertically in rectangle
         xref="paper", yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
