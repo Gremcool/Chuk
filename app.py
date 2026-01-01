@@ -9,7 +9,7 @@ import re
 # ==========================================================
 # CONFIG
 # ==========================================================
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSf8Mw53Loetlm4LAdRkMFhvr7JQrlTwIxa_KbYENc-nZa3AYSO4nk9DSevduzQ3DCvhhLH9xryBwfu/pub?gid=13772104&single=true&output=csv"
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=927771155&single=true&output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 LIGHT_BLUE = "#E8F1FF"
@@ -17,7 +17,7 @@ LIGHT_BLUE = "#E8F1FF"
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# CSS Styling
+# CSS Styling (TAB FIX IS HERE)
 # ==========================================================
 st.markdown(f"""
 <style>
@@ -34,23 +34,29 @@ body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
 .kpi-title {{ font-size:13px;color:#37474F;font-weight:600; }}
 .kpi-value {{ font-size:22px;font-weight:700;color:{HEADER_BLUE}; }}
 
+/* ===== TRUE FIREFOX-STYLE TABS ===== */
+.stTabs [data-baseweb="tab-list"] {{
+ gap: 0px !important;          /* <<< removes invisible spacing */
+}}
+
 .stTabs [data-baseweb="tab"] {{
  background:{LIGHT_BLUE};
  padding:8px 14px;
- margin:0;                     /* <<< tabs close together */
+ margin:0 !important;          /* <<< no spacing */
  border-radius:6px 6px 0 0;
  border:1px solid rgba(0,0,0,0.25);
  font-weight:600;
 }}
 
-.stTabs [data-baseweb="tab"]:not(:last-child) {{
- border-right:none;            /* <<< browser-style join */
+.stTabs [data-baseweb="tab"]:not(:first-child) {{
+ margin-left:-1px !important;  /* <<< overlap borders like Firefox */
 }}
 
 .stTabs [aria-selected="true"] {{
  background:{HEADER_BLUE};
  color:white;
  border:1px solid {HEADER_BLUE};
+ z-index:2;
 }}
 
 .stButton button {{
@@ -71,10 +77,10 @@ def load_data():
     r.raise_for_status()
     df_raw = pd.read_csv(StringIO(r.text))
 
-    df = df_raw[[
-        "Equipment name", "Service", "QTY Requested",
-        "Unit Price RWF", "Has Contract?", "Delivery Status"
-    ]].copy()
+    df = df_raw[
+        ["Equipment name", "Service", "QTY Requested",
+         "Unit Price RWF", "Has Contract?", "Delivery Status"]
+    ].copy()
 
     df.columns = [
         "Equipment", "Service", "Quantity",
@@ -206,10 +212,18 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig.update_yaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"))
 
     y0, y1 = 1.02, 1.12
-    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0, x1=1, y0=y0, y1=y1, fillcolor=HEADER_BLUE, line_width=0)
-    fig.add_annotation(x=0.5, y=(y0 + y1) / 2, xref="paper", yref="paper",
-                       text=f"<b>{title}</b>", showarrow=False,
-                       font=dict(color="white", size=15), yanchor="middle")
+    fig.add_shape(type="rect", xref="paper", yref="paper",
+                  x0=0, x1=1, y0=y0, y1=y1,
+                  fillcolor=HEADER_BLUE, line_width=0)
+
+    fig.add_annotation(
+        x=0.5, y=(y0 + y1) / 2,
+        xref="paper", yref="paper",
+        text=f"<b>{title}</b>",
+        showarrow=False,
+        font=dict(color="white", size=15),
+        yanchor="middle"
+    )
 
     return fig
 
