@@ -16,22 +16,11 @@ HEADER_BLUE = "#0D47A1"
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# CSS Styling  (ONLY small spacing adjustment)
+# CSS Styling (unchanged except tighter top spacing)
 # ==========================================================
 st.markdown(f"""
 <style>
-body {{
- font-family:Segoe UI;
- background:#FAFAFA;
- margin:10px;  /* 🔽 reduced from 20px */
-}}
-
-.kpi-grid {{
- display:grid;
- grid-template-columns:repeat(4,1fr);
- gap:14px;
- margin-bottom:18px;
-}}
+body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
 
 .kpi-card {{
  background:white;
@@ -101,7 +90,7 @@ st.caption(
 )
 
 # ==========================================================
-# WRAP LABEL FUNCTION
+# WRAP LABEL
 # ==========================================================
 def wrap_text(text, width=30):
     if not isinstance(text, str):
@@ -119,18 +108,16 @@ def wrap_text(text, width=30):
 df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
 
 # ==========================================================
-# TOP 10 FUNCTION
+# TOP 10
 # ==========================================================
 def top10(df_in, metric):
     if metric == "Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
-        df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
-    else:
-        df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
-    return df_grouped.sort_values(metric, ascending=False).head(10)
+        return df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max().sort_values(metric, ascending=False).head(10)
+    return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
-# BAR CHART FUNCTION (unchanged)
+# BAR CHART (unchanged)
 # ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
@@ -139,9 +126,7 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         y=y_col,
         color="Equipment_wrapped",
         color_discrete_sequence=px.colors.qualitative.Set3,
-        text=df_in[y_col].apply(
-            lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}"
-        )
+        text=df_in[y_col].apply(lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}")
     )
     fig.update_traces(textposition="outside")
     fig.update_layout(
@@ -155,40 +140,19 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     )
 
     y0, y1 = 1.02, 1.12
-    fig.add_shape(
-        type="rect",
-        xref="paper",
-        yref="paper",
-        x0=0, x1=1, y0=y0, y1=y1,
-        fillcolor=HEADER_BLUE,
-        line_width=0
-    )
-
-    fig.add_annotation(
-        x=0.5,
-        y=(y0 + y1) / 2,
-        xref="paper",
-        yref="paper",
-        text=f"<b>{title}</b>",
-        showarrow=False,
-        font=dict(color="white", size=15),
-        yanchor="middle"
-    )
+    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0, x1=1, y0=y0, y1=y1, fillcolor=HEADER_BLUE, line_width=0)
+    fig.add_annotation(x=0.5, y=(y0+y1)/2, xref="paper", yref="paper",
+                       text=f"<b>{title}</b>", showarrow=False,
+                       font=dict(color="white", size=15))
 
     fig.update_xaxes(tickangle=-45)
     return fig
 
 # ==========================================================
-# PIE CHART FUNCTION (NEW)
+# PIE CHART (NEW)
 # ==========================================================
 def pie_chart(df_in, column, title):
-    pie_df = (
-        df_in[column]
-        .fillna("Unknown")
-        .astype(str)
-        .value_counts()
-        .reset_index()
-    )
+    pie_df = df_in[column].fillna("Unknown").astype(str).value_counts().reset_index()
     pie_df.columns = [column, "Count"]
 
     fig = px.pie(
@@ -221,6 +185,17 @@ k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><
 k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df['Service'].nunique()}</div></div>", unsafe_allow_html=True)
 k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
+# ==========================================================
+# ✅ PIE CHARTS — DIRECTLY BELOW KPIs (AS REQUESTED)
+# ==========================================================
+st.markdown("### 📦 Procurement Status Overview")
+
+p1, p2 = st.columns(2)
+with p1:
+    st.plotly_chart(pie_chart(df, "Has Contracts?", "Contract Coverage"), use_container_width=True)
+with p2:
+    st.plotly_chart(pie_chart(df, "Delivery Status", "Delivery Status Distribution"), use_container_width=True)
+
 st.markdown("---")
 
 # ==========================================================
@@ -234,36 +209,16 @@ st.download_button(
 )
 
 # ==========================================================
-# TABS
+# TABS (UNCHANGED)
 # ==========================================================
 service_list = sorted(df["Service"].unique())
 tabs = st.tabs(["Overview"] + service_list)
 
-# ==========================================================
-# OVERVIEW TAB
-# ==========================================================
 with tabs[0]:
-    st.subheader("📦 Procurement Status Overview")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.plotly_chart(
-            pie_chart(df, "Has Contracts?", "Contract Coverage"),
-            use_container_width=True
-        )
-    with c2:
-        st.plotly_chart(
-            pie_chart(df, "Delivery Status", "Delivery Status Distribution"),
-            use_container_width=True
-        )
-
     st.plotly_chart(bar_chart(top10(df, "Unit_Price"), "Top 10 Equipment by Unit Price (USD)", "Unit_Price", "USD", True), use_container_width=True)
     st.plotly_chart(bar_chart(top10(df, "Total_Price"), "Top 10 Equipment by Total Price (USD)", "Total_Price", "USD", True), use_container_width=True)
     st.plotly_chart(bar_chart(top10(df, "Quantity"), "Top 10 Equipment by Quantity", "Quantity", "Quantity"), use_container_width=True)
 
-# ==========================================================
-# SERVICE TABS (unchanged)
-# ==========================================================
 for i, service in enumerate(service_list, start=1):
     with tabs[i]:
         d = df[df["Service"] == service]
