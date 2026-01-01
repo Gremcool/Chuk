@@ -161,7 +161,7 @@ def pie_chart(df_in, column, title):
 
     fig.update_traces(
         textinfo="percent+label",
-        textfont=dict(size=14, color="black"),   # thicker labels
+        textfont=dict(size=14, color="white"),   # thicker labels
         hovertemplate="<b>%{label}</b><br>Count: %{value}<br>Share: %{percent}<extra></extra>"
     )
 
