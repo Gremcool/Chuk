@@ -9,24 +9,28 @@ import re
 # ==========================================================
 # CONFIG
 # ==========================================================
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=927771155&single=true&output=csv"
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSf8Mw53Loetlm4LAdRkMFhvr7JQrlTwIxa_KbYENc-nZa3AYSO4nk9DSevduzQ3DCvhhLH9xryBwfu/pub?gid=13772104&single=true&output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# CSS Styling
+# CSS Styling  (ONLY small spacing adjustment)
 # ==========================================================
 st.markdown(f"""
 <style>
-body {{ font-family:Segoe UI;background:#FAFAFA;margin:20px; }}
+body {{
+ font-family:Segoe UI;
+ background:#FAFAFA;
+ margin:10px;  /* 🔽 reduced from 20px */
+}}
 
 .kpi-grid {{
  display:grid;
  grid-template-columns:repeat(4,1fr);
  gap:14px;
- margin-bottom:25px;
+ margin-bottom:18px;
 }}
 
 .kpi-card {{
@@ -45,7 +49,7 @@ body {{ font-family:Segoe UI;background:#FAFAFA;margin:20px; }}
     color:white;
 }}
 
-hr {{ margin:25px 0; }}
+hr {{ margin:20px 0; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,14 +62,20 @@ def load_data():
     r.raise_for_status()
     df_raw = pd.read_csv(StringIO(r.text))
 
-    df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF"]].copy()
-    df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF"]
+    df = df_raw[
+        ["Equipment name", "Service", "QTY Requested", "Unit Price RWF",
+         "Has Contracts?", "Delivery Status"]
+    ].copy()
+
+    df.columns = [
+        "Equipment", "Service", "Quantity", "Unit_Price_RWF",
+        "Has Contracts?", "Delivery Status"
+    ]
 
     df["Equipment"] = df["Equipment"].astype(str).str.strip()
     df["Service"] = df["Service"].astype(str).str.strip()
     df.loc[df["Service"].isin(["", "nan", "None"]), "Service"] = "Unknown"
 
-    # ===== ROBUST NUMERIC PARSING =====
     def clean_numeric(col):
         col = col.astype(str).str.replace(",", "").str.replace(" ", "")
         col = col.replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
@@ -85,7 +95,10 @@ df = load_data()
 # ==========================================================
 # LAST UPDATED
 # ==========================================================
-st.caption(f"📊 **Data source:** Google Sheet  |  **Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.caption(
+    f"📊 **Data source:** Google Sheet  |  "
+    f"**Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+)
 
 # ==========================================================
 # WRAP LABEL FUNCTION
@@ -117,7 +130,7 @@ def top10(df_in, metric):
     return df_grouped.sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
-# BAR CHART FUNCTION
+# BAR CHART FUNCTION (unchanged)
 # ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
@@ -126,7 +139,9 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         y=y_col,
         color="Equipment_wrapped",
         color_discrete_sequence=px.colors.qualitative.Set3,
-        text=df_in[y_col].apply(lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}")
+        text=df_in[y_col].apply(
+            lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}"
+        )
     )
     fig.update_traces(textposition="outside")
     fig.update_layout(
@@ -134,39 +149,62 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=80,b=200),
+        margin=dict(t=140, b=200),
         xaxis_title="Equipment",
         yaxis_title=y_label
     )
-    
-    # ===== BLUE HEADER BOX =====
+
     y0, y1 = 1.02, 1.12
     fig.add_shape(
         type="rect",
         xref="paper",
         yref="paper",
-        x0=0,
-        x1=1,
-        y0=y0,
-        y1=y1,
+        x0=0, x1=1, y0=y0, y1=y1,
         fillcolor=HEADER_BLUE,
         line_width=0
     )
-    
-    # ===== TITLE TEXT SLIGHTLY HIGHER =====
+
     fig.add_annotation(
         x=0.5,
-        y=(y0 + y1)/2 + 0.005,  # <-- slightly higher
+        y=(y0 + y1) / 2,
         xref="paper",
         yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
         font=dict(color="white", size=15),
-        align="center",
         yanchor="middle"
     )
-    
+
     fig.update_xaxes(tickangle=-45)
+    return fig
+
+# ==========================================================
+# PIE CHART FUNCTION (NEW)
+# ==========================================================
+def pie_chart(df_in, column, title):
+    pie_df = (
+        df_in[column]
+        .fillna("Unknown")
+        .astype(str)
+        .value_counts()
+        .reset_index()
+    )
+    pie_df.columns = [column, "Count"]
+
+    fig = px.pie(
+        pie_df,
+        names=column,
+        values="Count",
+        hole=0.45,
+        title=title
+    )
+
+    fig.update_traces(
+        textinfo="percent+label",
+        hovertemplate="<b>%{label}</b><br>Count: %{value}<br>Share: %{percent}<extra></extra>"
+    )
+
+    fig.update_layout(height=420)
     return fig
 
 # ==========================================================
@@ -186,7 +224,7 @@ k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div>
 st.markdown("---")
 
 # ==========================================================
-# DOWNLOAD BUTTON
+# DOWNLOAD
 # ==========================================================
 st.download_button(
     "⬇️ Download Full Data (CSV)",
@@ -201,13 +239,31 @@ st.download_button(
 service_list = sorted(df["Service"].unique())
 tabs = st.tabs(["Overview"] + service_list)
 
-# OVERVIEW
+# ==========================================================
+# OVERVIEW TAB
+# ==========================================================
 with tabs[0]:
+    st.subheader("📦 Procurement Status Overview")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.plotly_chart(
+            pie_chart(df, "Has Contracts?", "Contract Coverage"),
+            use_container_width=True
+        )
+    with c2:
+        st.plotly_chart(
+            pie_chart(df, "Delivery Status", "Delivery Status Distribution"),
+            use_container_width=True
+        )
+
     st.plotly_chart(bar_chart(top10(df, "Unit_Price"), "Top 10 Equipment by Unit Price (USD)", "Unit_Price", "USD", True), use_container_width=True)
     st.plotly_chart(bar_chart(top10(df, "Total_Price"), "Top 10 Equipment by Total Price (USD)", "Total_Price", "USD", True), use_container_width=True)
     st.plotly_chart(bar_chart(top10(df, "Quantity"), "Top 10 Equipment by Quantity", "Quantity", "Quantity"), use_container_width=True)
 
-# SERVICE TABS
+# ==========================================================
+# SERVICE TABS (unchanged)
+# ==========================================================
 for i, service in enumerate(service_list, start=1):
     with tabs[i]:
         d = df[df["Service"] == service]
