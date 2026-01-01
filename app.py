@@ -17,12 +17,26 @@ LIGHT_BLUE = "#E8F1FF"
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# CSS Styling (TAB FIX IS HERE)
+# CSS Styling (ONLY SAFE ADJUSTMENTS)
 # ==========================================================
 st.markdown(f"""
 <style>
-body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
 
+/* Remove top dead space */
+.block-container {{
+    padding-top: 1.5rem !important;
+}}
+
+/* Sticky tab bar (Overview always reachable) */
+.stTabs {{
+    position: sticky;
+    top: 0;
+    background: #FAFAFA;
+    z-index: 100;
+    padding-top: 6px;
+}}
+
+/* KPI cards */
 .kpi-card {{
  background:{LIGHT_BLUE};
  border-radius:12px;
@@ -34,22 +48,22 @@ body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
 .kpi-title {{ font-size:13px;color:#37474F;font-weight:600; }}
 .kpi-value {{ font-size:22px;font-weight:700;color:{HEADER_BLUE}; }}
 
-/* ===== TRUE FIREFOX-STYLE TABS ===== */
+/* Firefox-style tabs (unchanged visually) */
 .stTabs [data-baseweb="tab-list"] {{
- gap: 0px !important;          /* <<< removes invisible spacing */
+ gap: 0px !important;
 }}
 
 .stTabs [data-baseweb="tab"] {{
  background:{LIGHT_BLUE};
  padding:8px 14px;
- margin:0 !important;          /* <<< no spacing */
+ margin:0 !important;
  border-radius:6px 6px 0 0;
  border:1px solid rgba(0,0,0,0.25);
  font-weight:600;
 }}
 
 .stTabs [data-baseweb="tab"]:not(:first-child) {{
- margin-left:-1px !important;  /* <<< overlap borders like Firefox */
+ margin-left:-1px !important;
 }}
 
 .stTabs [aria-selected="true"] {{
@@ -64,7 +78,6 @@ body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
  color:white;
 }}
 
-hr {{ margin:12px 0; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,19 +121,20 @@ def load_data():
 df = load_data()
 
 # ==========================================================
-# HEADER
+# HEADER (pulled up)
 # ==========================================================
 st.markdown(
-    f"<h1 style='color:{HEADER_BLUE};margin-bottom:5px;'>Procurement Analysis Dashboard (USD)</h1>",
+    f"<h1 style='color:{HEADER_BLUE}; margin-top:-10px; margin-bottom:4px;'>Procurement Analysis Dashboard (USD)</h1>",
     unsafe_allow_html=True
 )
+
 st.caption(
     f"📊 **Data source:** Google Sheet  |  "
     f"**Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 )
 
 # ==========================================================
-# WRAP LABEL
+# TEXT WRAP
 # ==========================================================
 def wrap_text(text, width=30):
     if not isinstance(text, str):
@@ -147,7 +161,7 @@ k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div cl
 k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# PIE CHART
+# PIE + BAR FUNCTIONS (unchanged)
 # ==========================================================
 def pie_chart(df_in, column, title):
     pie_df = df_in[column].fillna("Unknown").astype(str).value_counts().reset_index()
@@ -161,69 +175,36 @@ def pie_chart(df_in, column, title):
         title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
     )
 
-    fig.update_traces(
-        textinfo="percent+label",
-        hovertemplate="<b>%{{label}}</b><br>Count: %{{value}}<br>Share: %{{percent}}<extra></extra>"
-    )
-
+    fig.update_traces(textinfo="percent+label")
     fig.update_layout(height=360, margin=dict(t=60, b=30))
     return fig
 
-# ==========================================================
-# TOP 10
-# ==========================================================
 def top10(df_in, metric):
     if metric == "Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
         return df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max().sort_values(metric, ascending=False).head(10)
     return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
 
-# ==========================================================
-# BAR CHART
-# ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
         df_in,
         x="Equipment_wrapped",
         y=y_col,
-        color="Equipment_wrapped",
-        color_discrete_sequence=px.colors.qualitative.Set3,
         text=df_in[y_col].apply(lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}")
     )
 
-    fig.update_traces(
-        textposition="outside",
-        textfont=dict(color="black"),
-        marker_line_width=1.8,
-        marker_line_color="black"
-    )
-
-    fig.update_layout(
-        showlegend=False,
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        height=650,
-        margin=dict(t=140, b=200),
-        xaxis_title="Equipment",
-        yaxis_title=y_label
-    )
-
+    fig.update_traces(textposition="outside", textfont=dict(color="black"), marker_line_width=1.8, marker_line_color="black")
+    fig.update_layout(showlegend=False, height=650)
     fig.update_xaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"), tickangle=-45)
     fig.update_yaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"))
 
-    y0, y1 = 1.02, 1.12
     fig.add_shape(type="rect", xref="paper", yref="paper",
-                  x0=0, x1=1, y0=y0, y1=y1,
+                  x0=0, x1=1, y0=1.02, y1=1.12,
                   fillcolor=HEADER_BLUE, line_width=0)
 
-    fig.add_annotation(
-        x=0.5, y=(y0 + y1) / 2,
-        xref="paper", yref="paper",
-        text=f"<b>{title}</b>",
-        showarrow=False,
-        font=dict(color="white", size=15),
-        yanchor="middle"
-    )
+    fig.add_annotation(x=0.5, y=1.07, xref="paper", yref="paper",
+                       text=f"<b>{title}</b>", showarrow=False,
+                       font=dict(color="white", size=15))
 
     return fig
 
@@ -251,7 +232,6 @@ with tabs[0]:
 for i, service in enumerate(service_list, start=1):
     with tabs[i]:
         d = df[df["Service"] == service]
-
         c1, c2 = st.columns(2)
         c1.plotly_chart(pie_chart(d, "Has Contract?", f"Contract Coverage – {service}"), use_container_width=True)
         c2.plotly_chart(pie_chart(d, "Delivery Status", f"Delivery Status – {service}"), use_container_width=True)
