@@ -145,7 +145,7 @@ k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div cl
 k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# PIE
+# PIE CHART (ONLY MODIFIED SECTION)
 # ==========================================================
 def pie_chart(df_in, column, title):
     pie_df = df_in[column].fillna("Unknown").value_counts().reset_index()
@@ -158,7 +158,22 @@ def pie_chart(df_in, column, title):
         hole=0.45,
         title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
     )
-    fig.update_layout(height=360, margin=dict(t=60, b=30))
+
+    fig.update_traces(
+        textinfo="percent+label",
+        textfont=dict(size=14, color="black"),   # thicker labels
+        hovertemplate="<b>%{label}</b><br>Count: %{value}<br>Share: %{percent}<extra></extra>"
+    )
+
+    fig.update_layout(
+        height=320,                              # slightly smaller
+        margin=dict(t=55, b=20),
+        legend=dict(
+            font=dict(size=14),                 # thicker legend text
+            title_font=dict(size=14)
+        )
+    )
+
     return fig
 
 # ==========================================================
@@ -171,15 +186,15 @@ def top10(df_in, metric):
     return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
-# BAR CHART (FIXED)
+# BAR CHART
 # ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
         df_in,
         x="Equipment_wrapped",
         y=y_col,
-        color="Equipment_wrapped",                          # ✅ restored
-        color_discrete_sequence=px.colors.qualitative.Set3, # ✅ restored
+        color="Equipment_wrapped",
+        color_discrete_sequence=px.colors.qualitative.Set3,
         text=df_in[y_col].apply(lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}")
     )
 
@@ -203,17 +218,14 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig.update_xaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"), tickangle=-45)
     fig.update_yaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"))
 
-    # Perfectly centered title box (original logic)
     y0, y1 = 1.02, 1.12
     fig.add_shape(type="rect", xref="paper", yref="paper",
                   x0=0, x1=1, y0=y0, y1=y1,
                   fillcolor=HEADER_BLUE, line_width=0)
 
     fig.add_annotation(
-        x=0.5,
-        y=(y0 + y1) / 2,
-        xref="paper",
-        yref="paper",
+        x=0.5, y=(y0 + y1) / 2,
+        xref="paper", yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
         font=dict(color="white", size=15),
