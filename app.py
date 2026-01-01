@@ -17,17 +17,14 @@ LIGHT_BLUE = "#E8F1FF"
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# CSS Styling (ONLY SAFE ADJUSTMENTS)
+# CSS
 # ==========================================================
 st.markdown(f"""
 <style>
-
-/* Remove top dead space */
 .block-container {{
     padding-top: 1.5rem !important;
 }}
 
-/* Sticky tab bar (Overview always reachable) */
 .stTabs {{
     position: sticky;
     top: 0;
@@ -36,7 +33,6 @@ st.markdown(f"""
     padding-top: 6px;
 }}
 
-/* KPI cards */
 .kpi-card {{
  background:{LIGHT_BLUE};
  border-radius:12px;
@@ -48,10 +44,7 @@ st.markdown(f"""
 .kpi-title {{ font-size:13px;color:#37474F;font-weight:600; }}
 .kpi-value {{ font-size:22px;font-weight:700;color:{HEADER_BLUE}; }}
 
-/* Firefox-style tabs (unchanged visually) */
-.stTabs [data-baseweb="tab-list"] {{
- gap: 0px !important;
-}}
+.stTabs [data-baseweb="tab-list"] {{ gap:0px !important; }}
 
 .stTabs [data-baseweb="tab"] {{
  background:{LIGHT_BLUE};
@@ -72,12 +65,6 @@ st.markdown(f"""
  border:1px solid {HEADER_BLUE};
  z-index:2;
 }}
-
-.stButton button {{
- background-color:{HEADER_BLUE};
- color:white;
-}}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -107,7 +94,7 @@ def load_data():
     def clean_numeric(col):
         col = col.astype(str).str.replace(",", "").str.replace(" ", "")
         col = col.replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
-        col = col.apply(lambda x: re.sub(r"[^\d.]", "", x) if pd.notnull(x) else "0")
+        col = col.apply(lambda x: re.sub(r"[^\d.]", "", x))
         return pd.to_numeric(col, errors="coerce").fillna(0)
 
     df["Quantity"] = clean_numeric(df["Quantity"])
@@ -121,24 +108,21 @@ def load_data():
 df = load_data()
 
 # ==========================================================
-# HEADER (pulled up)
+# HEADER
 # ==========================================================
 st.markdown(
-    f"<h1 style='color:{HEADER_BLUE}; margin-top:-10px; margin-bottom:4px;'>Procurement Analysis Dashboard (USD)</h1>",
+    f"<h1 style='color:{HEADER_BLUE}; margin-top:-10px;'>Procurement Analysis Dashboard (USD)</h1>",
     unsafe_allow_html=True
 )
-
 st.caption(
     f"📊 **Data source:** Google Sheet  |  "
     f"**Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 )
 
 # ==========================================================
-# TEXT WRAP
+# WRAP TEXT
 # ==========================================================
 def wrap_text(text, width=30):
-    if not isinstance(text, str):
-        return ""
     words, lines, line = text.split(), [], ""
     for w in words:
         if len(line) + len(w) <= width:
@@ -161,10 +145,10 @@ k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div cl
 k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# PIE + BAR FUNCTIONS (unchanged)
+# PIE
 # ==========================================================
 def pie_chart(df_in, column, title):
-    pie_df = df_in[column].fillna("Unknown").astype(str).value_counts().reset_index()
+    pie_df = df_in[column].fillna("Unknown").value_counts().reset_index()
     pie_df.columns = [column, "Count"]
 
     fig = px.pie(
@@ -174,37 +158,67 @@ def pie_chart(df_in, column, title):
         hole=0.45,
         title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
     )
-
-    fig.update_traces(textinfo="percent+label")
     fig.update_layout(height=360, margin=dict(t=60, b=30))
     return fig
 
+# ==========================================================
+# TOP 10
+# ==========================================================
 def top10(df_in, metric):
     if metric == "Unit_Price":
-        df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
+        df_unique = df_in.drop_duplicates("Equipment_wrapped")
         return df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max().sort_values(metric, ascending=False).head(10)
     return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
 
+# ==========================================================
+# BAR CHART (FIXED)
+# ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
         df_in,
         x="Equipment_wrapped",
         y=y_col,
+        color="Equipment_wrapped",                          # ✅ restored
+        color_discrete_sequence=px.colors.qualitative.Set3, # ✅ restored
         text=df_in[y_col].apply(lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}")
     )
 
-    fig.update_traces(textposition="outside", textfont=dict(color="black"), marker_line_width=1.8, marker_line_color="black")
-    fig.update_layout(showlegend=False, height=650)
+    fig.update_traces(
+        textposition="outside",
+        textfont=dict(color="black"),
+        marker_line_width=1.8,
+        marker_line_color="black"
+    )
+
+    fig.update_layout(
+        showlegend=False,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        height=650,
+        margin=dict(t=140, b=200),
+        xaxis_title="Equipment",
+        yaxis_title=y_label
+    )
+
     fig.update_xaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"), tickangle=-45)
     fig.update_yaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"))
 
+    # Perfectly centered title box (original logic)
+    y0, y1 = 1.02, 1.12
     fig.add_shape(type="rect", xref="paper", yref="paper",
-                  x0=0, x1=1, y0=1.02, y1=1.12,
+                  x0=0, x1=1, y0=y0, y1=y1,
                   fillcolor=HEADER_BLUE, line_width=0)
 
-    fig.add_annotation(x=0.5, y=1.07, xref="paper", yref="paper",
-                       text=f"<b>{title}</b>", showarrow=False,
-                       font=dict(color="white", size=15))
+    fig.add_annotation(
+        x=0.5,
+        y=(y0 + y1) / 2,
+        xref="paper",
+        yref="paper",
+        text=f"<b>{title}</b>",
+        showarrow=False,
+        font=dict(color="white", size=15),
+        yanchor="middle"
+    )
 
     return fig
 
