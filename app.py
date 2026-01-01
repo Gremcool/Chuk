@@ -23,13 +23,6 @@ st.markdown(f"""
 <style>
 body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
 
-.kpi-grid {{
- display:grid;
- grid-template-columns:repeat(4,1fr);
- gap:14px;
- margin-bottom:15px;
-}}
-
 .kpi-card {{
  background:{LIGHT_BLUE};
  border-radius:12px;
@@ -43,11 +36,15 @@ body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
 
 .stTabs [data-baseweb="tab"] {{
  background:{LIGHT_BLUE};
- padding:8px 18px;
- margin:0 4px;
- border-radius:6px;
- border:1px solid rgba(0,0,0,0.15);
+ padding:8px 14px;
+ margin:0;                     /* <<< tabs close together */
+ border-radius:6px 6px 0 0;
+ border:1px solid rgba(0,0,0,0.25);
  font-weight:600;
+}}
+
+.stTabs [data-baseweb="tab"]:not(:last-child) {{
+ border-right:none;            /* <<< browser-style join */
 }}
 
 .stTabs [aria-selected="true"] {{
@@ -74,8 +71,15 @@ def load_data():
     r.raise_for_status()
     df_raw = pd.read_csv(StringIO(r.text))
 
-    df = df_raw[["Equipment name", "Service", "QTY Requested", "Unit Price RWF", "Has Contract?", "Delivery Status"]].copy()
-    df.columns = ["Equipment", "Service", "Quantity", "Unit_Price_RWF", "Has Contract?", "Delivery Status"]
+    df = df_raw[[
+        "Equipment name", "Service", "QTY Requested",
+        "Unit Price RWF", "Has Contract?", "Delivery Status"
+    ]].copy()
+
+    df.columns = [
+        "Equipment", "Service", "Quantity",
+        "Unit_Price_RWF", "Has Contract?", "Delivery Status"
+    ]
 
     df["Equipment"] = df["Equipment"].astype(str).str.strip()
     df["Service"] = df["Service"].astype(str).str.strip()
@@ -100,8 +104,14 @@ df = load_data()
 # ==========================================================
 # HEADER
 # ==========================================================
-st.markdown(f"<h1 style='color:{HEADER_BLUE};margin-bottom:5px;'>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=True)
-st.caption(f"📊 **Data source:** Google Sheet  |  **Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.markdown(
+    f"<h1 style='color:{HEADER_BLUE};margin-bottom:5px;'>Procurement Analysis Dashboard (USD)</h1>",
+    unsafe_allow_html=True
+)
+st.caption(
+    f"📊 **Data source:** Google Sheet  |  "
+    f"**Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+)
 
 # ==========================================================
 # WRAP LABEL
@@ -131,7 +141,7 @@ k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div cl
 k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# PIE CHART FUNCTION
+# PIE CHART
 # ==========================================================
 def pie_chart(df_in, column, title):
     pie_df = df_in[column].fillna("Unknown").astype(str).value_counts().reset_index()
@@ -147,10 +157,10 @@ def pie_chart(df_in, column, title):
 
     fig.update_traces(
         textinfo="percent+label",
-        hovertemplate="<b>%{label}</b><br>Count: %{value}<br>Share: %{percent}<extra></extra>"
+        hovertemplate="<b>%{{label}}</b><br>Count: %{{value}}<br>Share: %{{percent}}<extra></extra>"
     )
 
-    fig.update_layout(height=360, margin=dict(t=60,b=30))
+    fig.update_layout(height=360, margin=dict(t=60, b=30))
     return fig
 
 # ==========================================================
@@ -159,10 +169,8 @@ def pie_chart(df_in, column, title):
 def top10(df_in, metric):
     if metric == "Unit_Price":
         df_unique = df_in.drop_duplicates(subset=["Equipment_wrapped"])
-        df_grouped = df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max()
-    else:
-        df_grouped = df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum()
-    return df_grouped.sort_values(metric, ascending=False).head(10)
+        return df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max().sort_values(metric, ascending=False).head(10)
+    return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
 # BAR CHART
@@ -189,39 +197,19 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=140,b=200),
+        margin=dict(t=140, b=200),
         xaxis_title="Equipment",
         yaxis_title=y_label
     )
 
-    fig.update_xaxes(
-        tickangle=-45,
-        showline=True,
-        linewidth=2,
-        linecolor="black",
-        tickfont=dict(color="black")
-    )
-
-    fig.update_yaxes(
-        showline=True,
-        linewidth=2,
-        linecolor="black",
-        tickfont=dict(color="black")
-    )
+    fig.update_xaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"), tickangle=-45)
+    fig.update_yaxes(showline=True, linewidth=2, linecolor="black", tickfont=dict(color="black"))
 
     y0, y1 = 1.02, 1.12
-    fig.add_shape(type="rect", xref="paper", yref="paper",
-                  x0=0, x1=1, y0=y0, y1=y1,
-                  fillcolor=HEADER_BLUE, line_width=0)
-
-    fig.add_annotation(
-        x=0.5, y=(y0+y1)/2,
-        xref="paper", yref="paper",
-        text=f"<b>{title}</b>",
-        showarrow=False,
-        font=dict(color="white", size=15),
-        yanchor="middle"
-    )
+    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0, x1=1, y0=y0, y1=y1, fillcolor=HEADER_BLUE, line_width=0)
+    fig.add_annotation(x=0.5, y=(y0 + y1) / 2, xref="paper", yref="paper",
+                       text=f"<b>{title}</b>", showarrow=False,
+                       font=dict(color="white", size=15), yanchor="middle")
 
     return fig
 
@@ -237,8 +225,7 @@ service_list = sorted(df["Service"].unique())
 tabs = st.tabs(["Overview"] + service_list)
 
 with tabs[0]:
-    st.markdown(f"<h3 style='color:{HEADER_BLUE};margin-bottom:5px;'>Procurement Status Overview</h3>", unsafe_allow_html=True)
-
+    st.markdown(f"<h3 style='color:{HEADER_BLUE};'>Procurement Status Overview</h3>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     c1.plotly_chart(pie_chart(df, "Has Contract?", "Contract Coverage"), use_container_width=True)
     c2.plotly_chart(pie_chart(df, "Delivery Status", "Delivery Status Distribution"), use_container_width=True)
@@ -250,6 +237,11 @@ with tabs[0]:
 for i, service in enumerate(service_list, start=1):
     with tabs[i]:
         d = df[df["Service"] == service]
+
+        c1, c2 = st.columns(2)
+        c1.plotly_chart(pie_chart(d, "Has Contract?", f"Contract Coverage – {service}"), use_container_width=True)
+        c2.plotly_chart(pie_chart(d, "Delivery Status", f"Delivery Status – {service}"), use_container_width=True)
+
         st.plotly_chart(bar_chart(top10(d, "Unit_Price"), f"Top 10 Unit Price – {service}", "Unit_Price", "USD", True), use_container_width=True)
         st.plotly_chart(bar_chart(top10(d, "Total_Price"), f"Top 10 Total Price – {service}", "Total_Price", "USD", True), use_container_width=True)
         st.plotly_chart(bar_chart(top10(d, "Quantity"), f"Top 10 Quantity – {service}", "Quantity", "Quantity"), use_container_width=True)
