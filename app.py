@@ -78,12 +78,12 @@ def load_data():
 
     df = df_raw[
         ["Equipment name", "Service", "QTY Requested", "Unit Price RWF",
-         "Has Contracts?", "Delivery Status"]
+         "Has Contract?", "Delivery Status"]
     ].copy()
 
     df.columns = [
         "Equipment", "Service", "Quantity", "Unit_Price_RWF",
-        "Has Contracts?", "Delivery Status"
+        "Has Contract?", "Delivery Status"
     ]
 
     df["Equipment"] = df["Equipment"].astype(str).str.strip()
@@ -235,7 +235,7 @@ st.markdown("### 📦 Procurement Status Overview")
 
 p1, p2 = st.columns(2)
 with p1:
-    st.plotly_chart(pie_chart(df, "Has Contracts?", "Contract Coverage"), use_container_width=True)
+    st.plotly_chart(pie_chart(df, "Has Contract?", "Contract Coverage"), use_container_width=True)
 with p2:
     st.plotly_chart(pie_chart(df, "Delivery Status", "Delivery Status Distribution"), use_container_width=True)
 
