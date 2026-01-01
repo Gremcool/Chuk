@@ -9,24 +9,30 @@ import re
 # ==========================================================
 # CONFIG
 # ==========================================================
-GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSf8Mw53Loetlm4LAdRkMFhvr7JQrlTwIxa_KbYENc-nZa3AYSO4nk9DSevduzQ3DCvhhLH9xryBwfu/pub?gid=13772104&single=true&output=csv"
+GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzHV5uRT-b-3-0uBub083j6tOTdPU7NFK_ESyMKuT0pYNwMaWHFNy9uU1u8miMOQ/pub?gid=927771155&single=true&output=csv"
 USD_RATE = 1454
 HEADER_BLUE = "#0D47A1"
 LIGHT_BLUE = "#E3F2FD"
+DARK_BLUE = "#0D47A1"
 
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# CSS Styling (visual-only tweaks)
+# CSS Styling (MINIMAL + CORRECTIVE ONLY)
 # ==========================================================
 st.markdown(f"""
 <style>
 body {{ font-family:Segoe UI;background:#FAFAFA;margin:10px; }}
 
 h1 {{
- color:{HEADER_BLUE};
+ color:{DARK_BLUE};
  font-weight:700;
- margin-bottom:10px;
+ margin-bottom:8px;
+}}
+
+.section-title {{
+ color:{DARK_BLUE};
+ font-weight:600;
 }}
 
 .kpi-card {{
@@ -43,19 +49,15 @@ h1 {{
 .stTabs [data-baseweb="tab-list"] {{
  background:{LIGHT_BLUE};
  padding:6px;
- border-radius:10px;
- border:2px solid #BBDEFB;
-}}
-
-.stTabs [data-baseweb="tab"] {{
- font-weight:600;
  border-radius:8px;
 }}
 
-.stTabs [aria-selected="true"] {{
- background:{HEADER_BLUE};
- color:white;
- font-weight:700;
+.stTabs [data-baseweb="tab"] {{
+ border-right:1px solid rgba(0,0,0,0.25);
+}}
+
+.stTabs [data-baseweb="tab"]:last-child {{
+ border-right:none;
 }}
 
 .stButton button {{
@@ -107,7 +109,7 @@ def load_data():
 df = load_data()
 
 # ==========================================================
-# TITLE (now truly at top)
+# TITLE
 # ==========================================================
 st.markdown("<h1>Procurement Analysis Dashboard (USD)</h1>", unsafe_allow_html=True)
 
@@ -144,7 +146,7 @@ def top10(df_in, metric):
     return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
-# BAR CHART (axes enhanced)
+# BAR CHART (TITLE FIXED)
 # ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
@@ -168,36 +170,35 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         yaxis_title=y_label
     )
 
-    fig.update_xaxes(
-        tickangle=-45,
-        linecolor="black",
-        linewidth=2,
-        tickfont=dict(color="black")
-    )
-
-    fig.update_yaxes(
-        linecolor="black",
-        linewidth=2,
-        tickfont=dict(color="black")
-    )
-
     y0, y1 = 1.02, 1.12
-    fig.add_shape(type="rect", xref="paper", yref="paper",
-                  x0=0, x1=1, y0=y0, y1=y1,
-                  fillcolor=HEADER_BLUE, line_width=0)
+    fig.add_shape(
+        type="rect",
+        xref="paper",
+        yref="paper",
+        x0=0, x1=1,
+        y0=y0, y1=y1,
+        fillcolor=HEADER_BLUE,
+        line_width=0
+    )
 
     fig.add_annotation(
-        x=0.5, y=(y0 + y1) / 2,
-        xref="paper", yref="paper",
+        x=0.5,
+        y=(y0 + y1) / 2,  # ✅ perfectly centered again
+        xref="paper",
+        yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
-        font=dict(color="white", size=15)
+        font=dict(color="white", size=15),
+        yanchor="middle"
     )
+
+    fig.update_xaxes(tickangle=-45, linecolor="black", linewidth=2, tickfont=dict(color="black"))
+    fig.update_yaxes(linecolor="black", linewidth=2, tickfont=dict(color="black"))
 
     return fig
 
 # ==========================================================
-# PIE CHART (slightly smaller)
+# PIE CHART
 # ==========================================================
 def pie_chart(df_in, column, title):
     pie_df = df_in[column].fillna("Unknown").astype(str).value_counts().reset_index()
@@ -229,9 +230,9 @@ k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div cl
 k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# PIE CHARTS (tight spacing)
+# PIE CHARTS
 # ==========================================================
-st.markdown("### 📦 Procurement Status Overview")
+st.markdown("<div class='section-title'>📦 Procurement Status Overview</div>", unsafe_allow_html=True)
 
 p1, p2 = st.columns(2)
 with p1:
