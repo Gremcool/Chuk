@@ -67,6 +67,23 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================================
+# CHART STABILITY HELPER (NEW)
+# ==========================================================
+def stabilize_chart(fig):
+
+    fig.update_layout(
+        autosize=False,
+        width=1100,
+        height=650,
+        margin=dict(l=60, r=40, t=140, b=200),
+        uniformtext_minsize=12,
+        uniformtext_mode="hide"
+    )
+
+    return fig
+
+
+# ==========================================================
 # LOAD DATA
 # ==========================================================
 @st.cache_data(ttl=30)
@@ -159,9 +176,14 @@ def pie_chart(df_in, column, title):
     )
 
     fig.update_traces(textinfo="percent+label", textfont=dict(size=14, color="black"))
+
     fig.update_layout(height=320, margin=dict(t=55, b=20),
                       legend=dict(font=dict(size=14)))
+
+    fig = stabilize_chart(fig)
+
     return fig
+
 
 def top10(df_in, metric):
     if metric == "Unit_Price":
@@ -170,7 +192,7 @@ def top10(df_in, metric):
     return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
 
 # ==========================================================
-# BAR CHART (TITLE FIXED ONLY)
+# BAR CHART
 # ==========================================================
 def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig = px.bar(
@@ -202,7 +224,6 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
     fig.update_xaxes(showline=True, linewidth=2, linecolor="black", tickangle=-45)
     fig.update_yaxes(showline=True, linewidth=2, linecolor="black")
 
-    # Blue title band
     fig.add_shape(
         type="rect",
         xref="paper",
@@ -215,7 +236,6 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         line_width=0
     )
 
-    # CENTERED title (FIX)
     fig.add_annotation(
         x=0.5,
         y=1.08,
@@ -228,6 +248,8 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         yanchor="middle"
     )
 
+    fig = stabilize_chart(fig)
+
     return fig
 
 # ==========================================================
@@ -236,12 +258,11 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
 st.download_button("⬇️ Download Full Data (CSV)", df.to_csv(index=False), "procurement_data.csv")
 
 # ==========================================================
-# TABS → DEPARTMENTS & SERVICES
+# TABS
 # ==========================================================
 department_list = sorted(df["Department"].unique())
 tabs = st.tabs(["Overview"] + department_list)
 
-# OVERVIEW
 with tabs[0]:
     c1, c2 = st.columns(2)
     c1.plotly_chart(pie_chart(df, "Has Contract?", "Contract Coverage"), use_container_width=True)
@@ -251,7 +272,6 @@ with tabs[0]:
     st.plotly_chart(bar_chart(top10(df, "Total_Price"), "Top 10 Equipment by Total Price (USD)", "Total_Price", "USD", True), use_container_width=True)
     st.plotly_chart(bar_chart(top10(df, "Quantity"), "Top 10 Equipment by Quantity", "Quantity", "Quantity"), use_container_width=True)
 
-# DEPARTMENT → SERVICE DRILL-DOWN
 for i, dept in enumerate(department_list, start=1):
     with tabs[i]:
         dept_df = df[df["Department"] == dept]
