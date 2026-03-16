@@ -67,7 +67,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================================
-# CHART STABILITY HELPER (NEW)
+# CHART STABILITY HELPER
 # ==========================================================
 def stabilize_chart(fig):
 
@@ -75,7 +75,7 @@ def stabilize_chart(fig):
         autosize=False,
         width=1100,
         height=650,
-        margin=dict(l=60, r=40, t=140, b=200),
+        margin=dict(l=40, r=20, t=110, b=160),
         uniformtext_minsize=12,
         uniformtext_mode="hide"
     )
@@ -93,24 +93,26 @@ def load_data():
     df_raw = pd.read_csv(StringIO(r.text))
 
     df = df_raw[
-        ["Equipment name", "Department", "Service", "QTY Requested",
-         "Unit Price RWF", "Has Contract?", "Delivery Status"]
+        ["Equipment name","Department","Service","QTY Requested",
+         "Unit Price RWF","Has Contract?","Delivery Status",
+         "Final Priority 1","Phase II"]
     ].copy()
 
     df.columns = [
-        "Equipment", "Department", "Service", "Quantity",
-        "Unit_Price_RWF", "Has Contract?", "Delivery Status"
+        "Equipment","Department","Service","Quantity",
+        "Unit_Price_RWF","Has Contract?","Delivery Status",
+        "Final Priority 1","Phase II"
     ]
 
-    for col in ["Equipment", "Department", "Service"]:
+    for col in ["Equipment","Department","Service"]:
         df[col] = df[col].astype(str).str.strip()
-        df.loc[df[col].isin(["", "nan", "None"]), col] = "Unknown"
+        df.loc[df[col].isin(["","nan","None"]),col] = "Unknown"
 
     def clean_numeric(col):
-        col = col.astype(str).str.replace(",", "").str.replace(" ", "")
-        col = col.replace({"NA": "0", "-": "0", "": "0", "nan": "0", "None": "0"})
-        col = col.apply(lambda x: re.sub(r"[^\d.]", "", x))
-        return pd.to_numeric(col, errors="coerce").fillna(0)
+        col = col.astype(str).str.replace(",","").str.replace(" ","")
+        col = col.replace({"NA":"0","-":"0","":"0","nan":"0","None":"0"})
+        col = col.apply(lambda x: re.sub(r"[^\d.]","",x))
+        return pd.to_numeric(col,errors="coerce").fillna(0)
 
     df["Quantity"] = clean_numeric(df["Quantity"])
     df["Unit_Price_RWF"] = clean_numeric(df["Unit_Price_RWF"])
@@ -137,37 +139,39 @@ st.caption(
 # ==========================================================
 # WRAP TEXT
 # ==========================================================
-def wrap_text(text, width=30):
-    words, lines, line = text.split(), [], ""
+def wrap_text(text,width=30):
+    words,lines,line=text.split(),[], ""
     for w in words:
-        if len(line) + len(w) <= width:
-            line += (" " if line else "") + w
+        if len(line)+len(w)<=width:
+            line+=(" " if line else "")+w
         else:
             lines.append(line)
-            line = w
+            line=w
     lines.append(line)
     return "<br>".join(lines[:2])
 
-df["Equipment_wrapped"] = df["Equipment"].apply(wrap_text)
+df["Equipment_wrapped"]=df["Equipment"].apply(wrap_text)
 
 # ==========================================================
 # KPI CARDS
 # ==========================================================
-k1, k2, k3, k4, k5 = st.columns(5)
-k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df['Total_Price'].sum()):,}</div></div>", unsafe_allow_html=True)
-k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df['Quantity'].sum()):,}</div></div>", unsafe_allow_html=True)
-k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Departments</div><div class='kpi-value'>{df['Department'].nunique()}</div></div>", unsafe_allow_html=True)
-k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df['Service'].nunique()}</div></div>", unsafe_allow_html=True)
-k5.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>", unsafe_allow_html=True)
+k1,k2,k3,k4,k5=st.columns(5)
+
+k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df['Total_Price'].sum()):,}</div></div>",unsafe_allow_html=True)
+k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df['Quantity'].sum()):,}</div></div>",unsafe_allow_html=True)
+k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Departments</div><div class='kpi-value'>{df['Department'].nunique()}</div></div>",unsafe_allow_html=True)
+k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df['Service'].nunique()}</div></div>",unsafe_allow_html=True)
+k5.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>",unsafe_allow_html=True)
 
 # ==========================================================
-# CHART HELPERS
+# PIE CHART
 # ==========================================================
-def pie_chart(df_in, column, title):
-    pie_df = df_in[column].fillna("Unknown").value_counts().reset_index()
-    pie_df.columns = [column, "Count"]
+def pie_chart(df_in,column,title):
 
-    fig = px.pie(
+    pie_df=df_in[column].fillna("Unknown").value_counts().reset_index()
+    pie_df.columns=[column,"Count"]
+
+    fig=px.pie(
         pie_df,
         names=column,
         values="Count",
@@ -175,33 +179,42 @@ def pie_chart(df_in, column, title):
         title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
     )
 
-    fig.update_traces(textinfo="percent+label", textfont=dict(size=14, color="black"))
+    fig.update_traces(
+        textinfo="percent+label",
+        textfont=dict(size=14,color="black")
+    )
 
-    fig.update_layout(height=320, margin=dict(t=55, b=20),
-                      legend=dict(font=dict(size=14)))
+    fig.update_layout(
+        height=320,
+        margin=dict(t=45,b=5,l=10,r=10),   # reduced whitespace
+        legend=dict(font=dict(size=14))
+    )
 
-    fig = stabilize_chart(fig)
+    fig=stabilize_chart(fig)
 
     return fig
 
 
-def top10(df_in, metric):
-    if metric == "Unit_Price":
-        df_unique = df_in.drop_duplicates("Equipment_wrapped")
-        return df_unique.groupby("Equipment_wrapped", as_index=False)[metric].max().sort_values(metric, ascending=False).head(10)
-    return df_in.groupby("Equipment_wrapped", as_index=False)[metric].sum().sort_values(metric, ascending=False).head(10)
-
 # ==========================================================
 # BAR CHART
 # ==========================================================
-def bar_chart(df_in, title, y_col, y_label, is_currency=False):
-    fig = px.bar(
+def top10(df_in,metric):
+    if metric=="Unit_Price":
+        df_unique=df_in.drop_duplicates("Equipment_wrapped")
+        return df_unique.groupby("Equipment_wrapped",as_index=False)[metric].max().sort_values(metric,ascending=False).head(10)
+
+    return df_in.groupby("Equipment_wrapped",as_index=False)[metric].sum().sort_values(metric,ascending=False).head(10)
+
+
+def bar_chart(df_in,title,y_col,y_label,is_currency=False):
+
+    fig=px.bar(
         df_in,
         x="Equipment_wrapped",
         y=y_col,
         color="Equipment_wrapped",
         color_discrete_sequence=px.colors.qualitative.Set3,
-        text=df_in[y_col].apply(lambda x: f"${int(x):,}" if is_currency else f"{int(x):,}")
+        text=df_in[y_col].apply(lambda x:f"${int(x):,}" if is_currency else f"{int(x):,}")
     )
 
     fig.update_traces(
@@ -216,22 +229,20 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         plot_bgcolor="white",
         paper_bgcolor="white",
         height=650,
-        margin=dict(t=140, b=200),
+        margin=dict(t=140,b=200),
         xaxis_title="Equipment",
         yaxis_title=y_label
     )
 
-    fig.update_xaxes(showline=True, linewidth=2, linecolor="black", tickangle=-45)
-    fig.update_yaxes(showline=True, linewidth=2, linecolor="black")
+    fig.update_xaxes(showline=True,linewidth=2,linecolor="black",tickangle=-45)
+    fig.update_yaxes(showline=True,linewidth=2,linecolor="black")
 
     fig.add_shape(
         type="rect",
         xref="paper",
         yref="paper",
-        x0=0,
-        x1=1,
-        y0=1.03,
-        y1=1.13,
+        x0=0,x1=1,
+        y0=1.03,y1=1.13,
         fillcolor=HEADER_BLUE,
         line_width=0
     )
@@ -243,58 +254,74 @@ def bar_chart(df_in, title, y_col, y_label, is_currency=False):
         yref="paper",
         text=f"<b>{title}</b>",
         showarrow=False,
-        font=dict(color="white", size=15),
+        font=dict(color="white",size=15),
         xanchor="center",
         yanchor="middle"
     )
 
-    fig = stabilize_chart(fig)
+    fig=stabilize_chart(fig)
 
     return fig
+
 
 # ==========================================================
 # DOWNLOAD
 # ==========================================================
-st.download_button("⬇️ Download Full Data (CSV)", df.to_csv(index=False), "procurement_data.csv")
+st.download_button("⬇️ Download Full Data (CSV)",df.to_csv(index=False),"procurement_data.csv")
 
 # ==========================================================
 # TABS
 # ==========================================================
-department_list = sorted(df["Department"].unique())
-tabs = st.tabs(["Overview"] + department_list)
+department_list=sorted(df["Department"].unique())
+tabs=st.tabs(["Overview"]+department_list)
 
+# ==========================================================
+# OVERVIEW
+# ==========================================================
 with tabs[0]:
-    c1, c2 = st.columns(2)
-    c1.plotly_chart(pie_chart(df, "Has Contract?", "Contract Coverage"), use_container_width=True)
-    c2.plotly_chart(pie_chart(df, "Delivery Status", "Delivery Status Distribution"), use_container_width=True)
 
-    st.plotly_chart(bar_chart(top10(df, "Unit_Price"), "Top 10 Equipment by Unit Price (USD)", "Unit_Price", "USD", True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df, "Total_Price"), "Top 10 Equipment by Total Price (USD)", "Total_Price", "USD", True), use_container_width=True)
-    st.plotly_chart(bar_chart(top10(df, "Quantity"), "Top 10 Equipment by Quantity", "Quantity", "Quantity"), use_container_width=True)
+    c1,c2,c3=st.columns(3)
 
-for i, dept in enumerate(department_list, start=1):
+    c1.plotly_chart(pie_chart(df,"Has Contract?","Contract Coverage"),use_container_width=True)
+    c2.plotly_chart(pie_chart(df,"Final Priority 1","Final Priority 1"),use_container_width=True)
+    c3.plotly_chart(pie_chart(df,"Phase II","Phase II"),use_container_width=True)
+
+    st.plotly_chart(bar_chart(top10(df,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True),use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True),use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df,"Quantity"),"Top 10 Equipment by Quantity","Quantity","Quantity"),use_container_width=True)
+
+# ==========================================================
+# DEPARTMENT TABS
+# ==========================================================
+for i,dept in enumerate(department_list,start=1):
+
     with tabs[i]:
-        dept_df = df[df["Department"] == dept]
-        services = sorted(dept_df["Service"].unique())
 
-        if len(services) > 1:
-            service_tabs = st.tabs(["All Services"] + services)
+        dept_df=df[df["Department"]==dept]
+        services=sorted(dept_df["Service"].unique())
+
+        if len(services)>1:
+            service_tabs=st.tabs(["All Services"]+services)
         else:
-            service_tabs = [st.container()]
+            service_tabs=[st.container()]
 
-        for j, svc_tab in enumerate(service_tabs):
+        for j,svc_tab in enumerate(service_tabs):
+
             with svc_tab:
-                if len(services) > 1 and j > 0:
-                    d = dept_df[dept_df["Service"] == services[j - 1]]
-                    title_suffix = f"{dept} – {services[j - 1]}"
+
+                if len(services)>1 and j>0:
+                    d=dept_df[dept_df["Service"]==services[j-1]]
+                    title_suffix=f"{dept} – {services[j-1]}"
                 else:
-                    d = dept_df
-                    title_suffix = dept
+                    d=dept_df
+                    title_suffix=dept
 
-                c1, c2 = st.columns(2)
-                c1.plotly_chart(pie_chart(d, "Has Contract?", f"Contract Coverage – {title_suffix}"), use_container_width=True)
-                c2.plotly_chart(pie_chart(d, "Delivery Status", f"Delivery Status – {title_suffix}"), use_container_width=True)
+                c1,c2,c3=st.columns(3)
 
-                st.plotly_chart(bar_chart(top10(d, "Unit_Price"), f"Top 10 Unit Price – {title_suffix}", "Unit_Price", "USD", True), use_container_width=True)
-                st.plotly_chart(bar_chart(top10(d, "Total_Price"), f"Top 10 Total Price – {title_suffix}", "Total_Price", "USD", True), use_container_width=True)
-                st.plotly_chart(bar_chart(top10(d, "Quantity"), f"Top 10 Quantity – {title_suffix}", "Quantity", "Quantity"), use_container_width=True)
+                c1.plotly_chart(pie_chart(d,"Has Contract?",f"Contract Coverage – {title_suffix}"),use_container_width=True)
+                c2.plotly_chart(pie_chart(d,"Final Priority 1",f"Final Priority 1 – {title_suffix}"),use_container_width=True)
+                c3.plotly_chart(pie_chart(d,"Phase II",f"Phase II – {title_suffix}"),use_container_width=True)
+
+                st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {title_suffix}","Unit_Price","USD",True),use_container_width=True)
+                st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {title_suffix}","Total_Price","USD",True),use_container_width=True)
+                st.plotly_chart(bar_chart(top10(d,"Quantity"),f"Top 10 Quantity – {title_suffix}","Quantity","Quantity"),use_container_width=True)
