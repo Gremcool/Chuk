@@ -67,7 +67,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================================
-# STABILITY
+# CHART STABILITY
 # ==========================================================
 def stabilize_chart(fig):
     fig.update_layout(
@@ -122,14 +122,17 @@ def load_data():
 df = load_data()
 
 # ==========================================================
-# NEW FUNCTION (CORE CHANGE)
+# FIXED FUNCTION (ONLY CHANGE)
 # ==========================================================
 def pie_contract_by_subset(df_in, subset_col, subset_value, title):
 
     filtered = df_in[df_in[subset_col] == subset_value]
 
     if filtered.empty:
-        filtered = pd.DataFrame({"Has Contract?": ["No Data"], "Count": [1]})
+        pie_df = pd.DataFrame({
+            "Has Contract?": ["No Data"],
+            "Count": [1]
+        })
     else:
         pie_df = filtered["Has Contract?"].fillna("Unknown").value_counts().reset_index()
         pie_df.columns = ["Has Contract?", "Count"]
@@ -142,7 +145,10 @@ def pie_contract_by_subset(df_in, subset_col, subset_value, title):
         title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
     )
 
-    fig.update_traces(textinfo="percent+label", textfont=dict(size=14, color="black"))
+    fig.update_traces(
+        textinfo="percent+label",
+        textfont=dict(size=14, color="black")
+    )
 
     fig.update_layout(
         height=320,
@@ -153,14 +159,19 @@ def pie_contract_by_subset(df_in, subset_col, subset_value, title):
     return stabilize_chart(fig)
 
 # ==========================================================
-# EXISTING PIE (UNCHANGED)
+# ORIGINAL PIE (UNCHANGED)
 # ==========================================================
 def pie_chart(df_in,column,title):
     pie_df=df_in[column].fillna("Unknown").value_counts().reset_index()
     pie_df.columns=[column,"Count"]
 
-    fig=px.pie(pie_df,names=column,values="Count",hole=0.45,
-               title=f"<b style='color:{HEADER_BLUE}'>{title}</b>")
+    fig=px.pie(
+        pie_df,
+        names=column,
+        values="Count",
+        hole=0.45,
+        title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
+    )
 
     fig.update_traces(textinfo="percent+label", textfont=dict(size=14,color="black"))
     fig.update_layout(height=320,margin=dict(t=45,b=5,l=10,r=10))
