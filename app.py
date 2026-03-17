@@ -92,13 +92,13 @@ def load_data():
     df = df_raw[
         ["Equipment name","Department","Service","QTY Requested",
          "Unit Price RWF","Has Contract?","Delivery Status",
-         "Phase 1","Phase II"]
+         "Phase I","Phase II"]
     ].copy()
 
     df.columns = [
         "Equipment","Department","Service","Quantity",
         "Unit_Price_RWF","Has Contract?","Delivery Status",
-        "Phase 1","Phase II"
+        "Phase I","Phase II"
     ]
 
     for col in ["Equipment","Department","Service"]:
@@ -291,7 +291,7 @@ with tabs[0]:
     c1,c2,c3=st.columns(3)
 
     c1.plotly_chart(pie_chart(df,"Has Contract?","Contract Coverage"),use_container_width=True)
-    c2.plotly_chart(pie_contract_subset(df,"Phase 1","Phase 1 – Contract Coverage"),use_container_width=True)
+    c2.plotly_chart(pie_contract_subset(df,"Phase I","Phase I – Contract Coverage"),use_container_width=True)
     c3.plotly_chart(pie_contract_subset(df,"Phase II","Phase II – Contract Coverage"),use_container_width=True)
 
     st.plotly_chart(bar_chart(top10(df,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True),use_container_width=True)
@@ -327,7 +327,7 @@ for i,dept in enumerate(department_list,start=1):
                 c1,c2,c3=st.columns(3)
 
                 c1.plotly_chart(pie_chart(d,"Has Contract?",f"Contract Coverage – {title_suffix}"),use_container_width=True)
-                c2.plotly_chart(pie_contract_subset(d,"Phase 1",f"Phase 1 – {title_suffix}"),use_container_width=True)
+                c2.plotly_chart(pie_contract_subset(d,"Phase I",f"Phase I – {title_suffix}"),use_container_width=True)
                 c3.plotly_chart(pie_contract_subset(d,"Phase II",f"Phase II – {title_suffix}"),use_container_width=True)
 
                 st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {title_suffix}","Unit_Price","USD",True),use_container_width=True)
