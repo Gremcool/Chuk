@@ -67,7 +67,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================================
-# CHART STABILITY
+# CHART STABILITY HELPER
 # ==========================================================
 def stabilize_chart(fig):
     fig.update_layout(
@@ -122,46 +122,49 @@ def load_data():
 df = load_data()
 
 # ==========================================================
-# FIXED FUNCTION (ONLY CHANGE)
+# HEADER
 # ==========================================================
-def pie_contract_by_subset(df_in, subset_col, subset_value, title):
-
-    filtered = df_in[df_in[subset_col] == subset_value]
-
-    if filtered.empty:
-        pie_df = pd.DataFrame({
-            "Has Contract?": ["No Data"],
-            "Count": [1]
-        })
-    else:
-        pie_df = filtered["Has Contract?"].fillna("Unknown").value_counts().reset_index()
-        pie_df.columns = ["Has Contract?", "Count"]
-
-    fig = px.pie(
-        pie_df,
-        names="Has Contract?",
-        values="Count",
-        hole=0.45,
-        title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
-    )
-
-    fig.update_traces(
-        textinfo="percent+label",
-        textfont=dict(size=14, color="black")
-    )
-
-    fig.update_layout(
-        height=320,
-        margin=dict(t=45, b=5, l=10, r=10),
-        legend=dict(font=dict(size=14))
-    )
-
-    return stabilize_chart(fig)
+st.markdown(
+    f"<h1 style='color:{HEADER_BLUE}; margin-top:-10px;'>Procurement Analysis Dashboard (USD)</h1>",
+    unsafe_allow_html=True
+)
+st.caption(
+    f"📊 **Data source:** Google Sheet  |  "
+    f"**Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+)
 
 # ==========================================================
-# ORIGINAL PIE (UNCHANGED)
+# WRAP TEXT
+# ==========================================================
+def wrap_text(text,width=30):
+    words,lines,line=text.split(),[], ""
+    for w in words:
+        if len(line)+len(w)<=width:
+            line+=(" " if line else "")+w
+        else:
+            lines.append(line)
+            line=w
+    lines.append(line)
+    return "<br>".join(lines[:2])
+
+df["Equipment_wrapped"]=df["Equipment"].apply(wrap_text)
+
+# ==========================================================
+# KPI CARDS
+# ==========================================================
+k1,k2,k3,k4,k5=st.columns(5)
+
+k1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Budget</div><div class='kpi-value'>${int(df['Total_Price'].sum()):,}</div></div>",unsafe_allow_html=True)
+k2.markdown(f"<div class='kpi-card'><div class='kpi-title'>Total Quantity</div><div class='kpi-value'>{int(df['Quantity'].sum()):,}</div></div>",unsafe_allow_html=True)
+k3.markdown(f"<div class='kpi-card'><div class='kpi-title'>Departments</div><div class='kpi-value'>{df['Department'].nunique()}</div></div>",unsafe_allow_html=True)
+k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div class='kpi-value'>{df['Service'].nunique()}</div></div>",unsafe_allow_html=True)
+k5.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>",unsafe_allow_html=True)
+
+# ==========================================================
+# PIE CHART (UNCHANGED)
 # ==========================================================
 def pie_chart(df_in,column,title):
+
     pie_df=df_in[column].fillna("Unknown").value_counts().reset_index()
     pie_df.columns=[column,"Count"]
 
@@ -173,10 +176,33 @@ def pie_chart(df_in,column,title):
         title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
     )
 
-    fig.update_traces(textinfo="percent+label", textfont=dict(size=14,color="black"))
-    fig.update_layout(height=320,margin=dict(t=45,b=5,l=10,r=10))
+    fig.update_traces(
+        textinfo="percent+label",
+        textfont=dict(size=14,color="black")
+    )
 
-    return stabilize_chart(fig)
+    fig.update_layout(
+        height=320,
+        margin=dict(t=45,b=5,l=10,r=10),
+        legend=dict(font=dict(size=14))
+    )
+
+    fig=stabilize_chart(fig)
+
+    return fig
+
+# ==========================================================
+# NEW FILTER FUNCTION (ONLY ADDITION)
+# ==========================================================
+def pie_contract_subset(df_in, subset_col, title):
+
+    subset_series = df_in[subset_col].astype(str).str.strip().str.lower()
+    filtered = df_in[subset_series.isin(["yes","true","1"])]
+
+    if filtered.empty:
+        filtered = pd.DataFrame({"Has Contract?": ["No Data"]})
+
+    return pie_chart(filtered, "Has Contract?", title)
 
 # ==========================================================
 # BAR CHART (UNCHANGED)
@@ -185,28 +211,66 @@ def top10(df_in,metric):
     if metric=="Unit_Price":
         df_unique=df_in.drop_duplicates("Equipment_wrapped")
         return df_unique.groupby("Equipment_wrapped",as_index=False)[metric].max().sort_values(metric,ascending=False).head(10)
+
     return df_in.groupby("Equipment_wrapped",as_index=False)[metric].sum().sort_values(metric,ascending=False).head(10)
 
+
 def bar_chart(df_in,title,y_col,y_label,is_currency=False):
-    fig=px.bar(df_in,x="Equipment_wrapped",y=y_col,color="Equipment_wrapped",
-               color_discrete_sequence=px.colors.qualitative.Set3,
-               text=df_in[y_col].apply(lambda x:f"${int(x):,}" if is_currency else f"{int(x):,}"))
 
-    fig.update_traces(textposition="outside")
-    fig.update_layout(showlegend=False,plot_bgcolor="white",paper_bgcolor="white",
-                      height=650,margin=dict(t=140,b=200),
-                      xaxis_title="Equipment",yaxis_title=y_label)
+    fig=px.bar(
+        df_in,
+        x="Equipment_wrapped",
+        y=y_col,
+        color="Equipment_wrapped",
+        color_discrete_sequence=px.colors.qualitative.Set3,
+        text=df_in[y_col].apply(lambda x:f"${int(x):,}" if is_currency else f"{int(x):,}")
+    )
 
-    fig.add_shape(type="rect",xref="paper",yref="paper",
-                  x0=0,x1=1,y0=1.03,y1=1.13,
-                  fillcolor=HEADER_BLUE,line_width=0)
+    fig.update_traces(
+        textposition="outside",
+        marker_line_width=1.8,
+        marker_line_color="black",
+        textfont=dict(color="black")
+    )
 
-    fig.add_annotation(x=0.5,y=1.08,xref="paper",yref="paper",
-                       text=f"<b>{title}</b>",showarrow=False,
-                       font=dict(color="white",size=15),
-                       xanchor="center",yanchor="middle")
+    fig.update_layout(
+        showlegend=False,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        height=650,
+        margin=dict(t=140,b=200),
+        xaxis_title="Equipment",
+        yaxis_title=y_label
+    )
 
-    return stabilize_chart(fig)
+    fig.update_xaxes(showline=True,linewidth=2,linecolor="black",tickangle=-45)
+    fig.update_yaxes(showline=True,linewidth=2,linecolor="black")
+
+    fig.add_shape(
+        type="rect",
+        xref="paper",
+        yref="paper",
+        x0=0,x1=1,
+        y0=1.03,y1=1.13,
+        fillcolor=HEADER_BLUE,
+        line_width=0
+    )
+
+    fig.add_annotation(
+        x=0.5,
+        y=1.08,
+        xref="paper",
+        yref="paper",
+        text=f"<b>{title}</b>",
+        showarrow=False,
+        font=dict(color="white",size=15),
+        xanchor="center",
+        yanchor="middle"
+    )
+
+    fig=stabilize_chart(fig)
+
+    return fig
 
 # ==========================================================
 # DOWNLOAD
@@ -227,8 +291,8 @@ with tabs[0]:
     c1,c2,c3=st.columns(3)
 
     c1.plotly_chart(pie_chart(df,"Has Contract?","Contract Coverage"),use_container_width=True)
-    c2.plotly_chart(pie_contract_by_subset(df,"Final Priority 1","Yes","Final Priority 1 – Contract Coverage"),use_container_width=True)
-    c3.plotly_chart(pie_contract_by_subset(df,"Phase II","Yes","Phase II – Contract Coverage"),use_container_width=True)
+    c2.plotly_chart(pie_contract_subset(df,"Final Priority 1","Final Priority 1 – Contract Coverage"),use_container_width=True)
+    c3.plotly_chart(pie_contract_subset(df,"Phase II","Phase II – Contract Coverage"),use_container_width=True)
 
     st.plotly_chart(bar_chart(top10(df,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True),use_container_width=True)
     st.plotly_chart(bar_chart(top10(df,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True),use_container_width=True)
@@ -263,8 +327,8 @@ for i,dept in enumerate(department_list,start=1):
                 c1,c2,c3=st.columns(3)
 
                 c1.plotly_chart(pie_chart(d,"Has Contract?",f"Contract Coverage – {title_suffix}"),use_container_width=True)
-                c2.plotly_chart(pie_contract_by_subset(d,"Final Priority 1","Yes",f"Final Priority 1 – {title_suffix}"),use_container_width=True)
-                c3.plotly_chart(pie_contract_by_subset(d,"Phase II","Yes",f"Phase II – {title_suffix}"),use_container_width=True)
+                c2.plotly_chart(pie_contract_subset(d,"Final Priority 1",f"Final Priority 1 – {title_suffix}"),use_container_width=True)
+                c3.plotly_chart(pie_contract_subset(d,"Phase II",f"Phase II – {title_suffix}"),use_container_width=True)
 
                 st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {title_suffix}","Unit_Price","USD",True),use_container_width=True)
                 st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {title_suffix}","Total_Price","USD",True),use_container_width=True)
