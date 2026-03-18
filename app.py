@@ -67,7 +67,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================================
-# CHART STABILITY HELPER (UNCHANGED)
+# CHART STABILITY HELPER
 # ==========================================================
 def stabilize_chart(fig):
     fig.update_layout(
@@ -161,7 +161,7 @@ k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div cl
 k5.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>",unsafe_allow_html=True)
 
 # ==========================================================
-# PIE CHART (FIXED SPACING ONLY)
+# PIE CHART (FIXED ONLY HERE)
 # ==========================================================
 def pie_chart(df_in,column,title):
 
@@ -181,12 +181,12 @@ def pie_chart(df_in,column,title):
         textfont=dict(size=14,color="black")
     )
 
-    # ✅ ONLY FIX: reduce vertical whitespace
+    # ✅ FIX APPLIED (no stabilize_chart here)
     fig.update_layout(
         autosize=False,
         width=1100,
-        height=300,
-        margin=dict(t=45,b=10,l=10,r=10),
+        height=280,
+        margin=dict(t=45,b=0,l=10,r=10),
         uniformtext_minsize=12,
         uniformtext_mode="hide",
         legend=dict(font=dict(size=14))
@@ -195,7 +195,7 @@ def pie_chart(df_in,column,title):
     return fig
 
 # ==========================================================
-# FILTER FUNCTION (UNCHANGED)
+# NEW FILTER FUNCTION (UNCHANGED)
 # ==========================================================
 def pie_contract_subset(df_in, subset_col, title):
 
@@ -216,6 +216,7 @@ def top10(df_in,metric):
         return df_unique.groupby("Equipment_wrapped",as_index=False)[metric].max().sort_values(metric,ascending=False).head(10)
 
     return df_in.groupby("Equipment_wrapped",as_index=False)[metric].sum().sort_values(metric,ascending=False).head(10)
+
 
 def bar_chart(df_in,title,y_col,y_label,is_currency=False):
 
@@ -274,4 +275,64 @@ def bar_chart(df_in,title,y_col,y_label,is_currency=False):
 
     return fig
 
-# (REST OF YOUR CODE REMAINS EXACTLY THE SAME)
+# ==========================================================
+# DOWNLOAD
+# ==========================================================
+st.download_button("⬇️ Download Full Data (CSV)",df.to_csv(index=False),"procurement_data.csv")
+
+# ==========================================================
+# TABS
+# ==========================================================
+department_list=sorted(df["Department"].unique())
+tabs=st.tabs(["Overview"]+department_list)
+
+# ==========================================================
+# OVERVIEW
+# ==========================================================
+with tabs[0]:
+
+    c1,c2,c3=st.columns(3)
+
+    c1.plotly_chart(pie_chart(df,"Has Contract?","Contract Coverage"),use_container_width=True)
+    c2.plotly_chart(pie_contract_subset(df,"Phase I","Phase I – Contract Coverage"),use_container_width=True)
+    c3.plotly_chart(pie_contract_subset(df,"Phase II","Phase II – Contract Coverage"),use_container_width=True)
+
+    st.plotly_chart(bar_chart(top10(df,"Unit_Price"),"Top 10 Equipment by Unit Price (USD)","Unit_Price","USD",True),use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df,"Total_Price"),"Top 10 Equipment by Total Price (USD)","Total_Price","USD",True),use_container_width=True)
+    st.plotly_chart(bar_chart(top10(df,"Quantity"),"Top 10 Equipment by Quantity","Quantity","Quantity"),use_container_width=True)
+
+# ==========================================================
+# DEPARTMENT TABS
+# ==========================================================
+for i,dept in enumerate(department_list,start=1):
+
+    with tabs[i]:
+
+        dept_df=df[df["Department"]==dept]
+        services=sorted(dept_df["Service"].unique())
+
+        if len(services)>1:
+            service_tabs=st.tabs(["All Services"]+services)
+        else:
+            service_tabs=[st.container()]
+
+        for j,svc_tab in enumerate(service_tabs):
+
+            with svc_tab:
+
+                if len(services)>1 and j>0:
+                    d=dept_df[dept_df["Service"]==services[j-1]]
+                    title_suffix=f"{dept} – {services[j-1]}"
+                else:
+                    d=dept_df
+                    title_suffix=dept
+
+                c1,c2,c3=st.columns(3)
+
+                c1.plotly_chart(pie_chart(d,"Has Contract?",f"Contract Coverage – {title_suffix}"),use_container_width=True)
+                c2.plotly_chart(pie_contract_subset(d,"Phase I",f"Phase I – {title_suffix}"),use_container_width=True)
+                c3.plotly_chart(pie_contract_subset(d,"Phase II",f"Phase II – {title_suffix}"),use_container_width=True)
+
+                st.plotly_chart(bar_chart(top10(d,"Unit_Price"),f"Top 10 Unit Price – {title_suffix}","Unit_Price","USD",True),use_container_width=True)
+                st.plotly_chart(bar_chart(top10(d,"Total_Price"),f"Top 10 Total Price – {title_suffix}","Total_Price","USD",True),use_container_width=True)
+                st.plotly_chart(bar_chart(top10(d,"Quantity"),f"Top 10 Quantity – {title_suffix}","Quantity","Quantity"),use_container_width=True)
