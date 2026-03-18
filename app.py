@@ -17,7 +17,7 @@ LIGHT_BLUE = "#E8F1FF"
 st.set_page_config(page_title="Procurement Analysis Dashboard", layout="wide")
 
 # ==========================================================
-# CSS (UNCHANGED)
+# CSS
 # ==========================================================
 st.markdown(f"""
 <style>
@@ -161,54 +161,60 @@ k4.markdown(f"<div class='kpi-card'><div class='kpi-title'>Services</div><div cl
 k5.markdown(f"<div class='kpi-card'><div class='kpi-title'>Equipment Items</div><div class='kpi-value'>{df['Equipment'].nunique()}</div></div>",unsafe_allow_html=True)
 
 # ==========================================================
-# PIE CHART (FIXED ONLY HERE)
+# PIE CHART (FIXED OVERLAP ISSUE)
 # ==========================================================
-def pie_chart(df_in,column,title):
+def pie_chart(df_in, column, title):
+    pie_df = df_in[column].fillna("Unknown").value_counts().reset_index()
+    pie_df.columns = [column, "Count"]
 
-    pie_df=df_in[column].fillna("Unknown").value_counts().reset_index()
-    pie_df.columns=[column,"Count"]
-
-    fig=px.pie(
+    fig = px.pie(
         pie_df,
         names=column,
         values="Count",
-        hole=0.45,
-        title=f"<b style='color:{HEADER_BLUE}'>{title}</b>"
+        hole=0.45
     )
 
     fig.update_traces(
         textinfo="percent+label",
-        textfont=dict(size=14,color="black")
+        textposition="inside", # Forces labels inside the donut to avoid title overlap
+        insidetextorientation="horizontal",
+        textfont=dict(size=13)
     )
 
-    # ✅ FIX APPLIED (no stabilize_chart here)
     fig.update_layout(
+        title={
+            'text': f"<b style='color:{HEADER_BLUE}'>{title}</b>",
+            'y': 0.98,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'
+        },
         autosize=False,
         width=1100,
         height=280,
-        margin=dict(t=45,b=0,l=10,r=10),
+        margin=dict(t=60, b=10, l=10, r=10),
         uniformtext_minsize=12,
         uniformtext_mode="hide",
-        legend=dict(font=dict(size=14))
+        legend=dict(font=dict(size=13), y=0.5)
     )
 
     return fig
 
 # ==========================================================
-# NEW FILTER FUNCTION (UNCHANGED)
+# NEW FILTER FUNCTION
 # ==========================================================
 def pie_contract_subset(df_in, subset_col, title):
-
     subset_series = df_in[subset_col].astype(str).str.strip().str.lower()
     filtered = df_in[subset_series.isin(["yes","true","1"])]
 
     if filtered.empty:
-        filtered = pd.DataFrame({"Has Contract?": ["No Data"]})
+        # Creating a dummy df to show 'No Data' rather than an error
+        return pie_chart(pd.DataFrame({"Has Contract?": ["No Data Available"], "Count": [1]}), "Has Contract?", title)
 
     return pie_chart(filtered, "Has Contract?", title)
 
 # ==========================================================
-# BAR CHART (UNCHANGED)
+# BAR CHART
 # ==========================================================
 def top10(df_in,metric):
     if metric=="Unit_Price":
